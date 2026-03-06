@@ -35,7 +35,7 @@ jobs:
           CIBW_TEST_COMMAND: pytest {project}/tests -v --ignore={project}/tests/integration
           CIBW_TEST_REQUIRES: pytest pytest-asyncio hypothesis
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wheels-${{ matrix.os }}
           path: ./wheelhouse/*.whl
@@ -48,7 +48,7 @@ jobs:
         with:
           submodules: recursive
       - run: pipx run build --sdist
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sdist
           path: dist/*.tar.gz
