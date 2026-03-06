@@ -1,0 +1,4 @@
+# file: /Users/vzein/Projects/pessoal/opensomeip-python/src/opensomeip/serialization.py
+# hypothesis_version: 6.151.9
+
+[b'\x00', 255, '!H', '!I', '!Q', '!b', '!d', '!f', '!h', '!i', '!q', 'utf-8']

@@ -1,0 +1,3 @@
+[submodule "extern/opensomeip"]
+	path = extern/opensomeip
+	url = https://github.com/siemens/opensomeip.git
