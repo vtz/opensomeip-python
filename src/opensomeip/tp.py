@@ -77,9 +77,7 @@ class TpManager:
         self._running = False
         self._reassembly_receiver.close()
 
-    def send(
-        self, message: Message, endpoint: Endpoint | None = None
-    ) -> None:
+    def send(self, message: Message, endpoint: Endpoint | None = None) -> None:
         """Send a message, segmenting it if larger than MTU.
 
         When the C++ extension is available, delegates to the native

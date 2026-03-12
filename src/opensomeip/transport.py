@@ -126,9 +126,7 @@ class Transport:
             try:
                 result = self._cpp.start()
                 if hasattr(result, "name") and result.name != "SUCCESS":
-                    raise TransportError(
-                        f"Native transport failed to start: {result.name}"
-                    )
+                    raise TransportError(f"Native transport failed to start: {result.name}")
             except TransportError:
                 raise
             except Exception:

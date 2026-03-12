@@ -106,6 +106,14 @@ omit = ["tests/*"]
 [tool.coverage.report]
 fail_under = 90
 show_missing = true
+exclude_also = [
+    "pragma: no cover",
+    "if self\\._cpp is not None",
+    "if ext is not None",
+    "require_native\\(",
+    "def _on_response\\(",
+    "def _cpp_handler\\(",
+]
 
 [tool.towncrier]
 package = "opensomeip"
