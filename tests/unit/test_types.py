@@ -17,7 +17,8 @@ class TestMessageType:
 
     def test_tp_variants(self) -> None:
         assert MessageType.TP_REQUEST == 0x20
-        assert MessageType.TP_RESPONSE == 0xA0
+        assert MessageType.TP_REQUEST_NO_RETURN == 0x21
+        assert MessageType.TP_NOTIFICATION == 0x22
 
     def test_is_int(self) -> None:
         assert isinstance(MessageType.REQUEST, int)

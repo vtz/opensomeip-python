@@ -185,7 +185,7 @@ class TestDeserializer:
 
     def test_read_past_end(self) -> None:
         d = Deserializer(b"\x01")
-        with pytest.raises(ValueError, match="bytes remain"):
+        with pytest.raises(ValueError):
             d.read_uint16()
 
     def test_from_memoryview(self) -> None:

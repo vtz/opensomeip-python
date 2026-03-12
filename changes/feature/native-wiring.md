@@ -1,0 +1,1 @@
+All Python wrapper modules (transport, SD, RPC, events, TP, E2E, serialization, logging) now delegate to the native C++ implementations when the extension is available, with graceful fallback to pure-Python stubs.

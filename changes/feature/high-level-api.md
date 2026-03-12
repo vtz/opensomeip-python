@@ -1,0 +1,1 @@
+High-level ``SomeIpServer`` and ``SomeIpClient`` convenience classes that compose transport, service discovery, RPC, events, TP, and E2E into unified interfaces with context manager and async support.

@@ -1,12 +1,14 @@
 """Bridge C++ opensomeip log output to Python's ``logging`` module.
 
-In the full implementation, a C++ callback is registered that invokes
-this bridge from the binding layer with the GIL acquired.
+When the C++ extension is available, registers a callback that routes
+C++ log messages through Python's logging infrastructure.
 """
 
 from __future__ import annotations
 
 import logging
+
+from opensomeip._bridge import get_ext
 
 _logger = logging.getLogger("opensomeip")
 
@@ -35,6 +37,8 @@ def _on_cpp_log(level: int, component: str, message: str) -> None:
 def configure_logging(level: int = logging.INFO) -> None:
     """Configure the opensomeip logger with a console handler.
 
+    Also registers the C++ log callback if the extension is available.
+
     Convenience for quick setup. For production use, configure the
     ``"opensomeip"`` logger via standard Python logging configuration.
     """
@@ -45,3 +49,7 @@ def configure_logging(level: int = logging.INFO) -> None:
             logging.Formatter("%(asctime)s [%(name)s] %(levelname)s: %(message)s")
         )
         _logger.addHandler(handler)
+
+    ext = get_ext()
+    if ext is not None and hasattr(ext, "set_log_callback"):
+        ext.set_log_callback(_on_cpp_log)

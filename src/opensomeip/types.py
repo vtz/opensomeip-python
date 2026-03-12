@@ -12,13 +12,14 @@ class MessageType(enum.IntEnum):
     REQUEST = 0x00
     REQUEST_NO_RETURN = 0x01
     NOTIFICATION = 0x02
+    REQUEST_ACK = 0x40
     RESPONSE = 0x80
     ERROR = 0x81
+    RESPONSE_ACK = 0xC0
+    ERROR_ACK = 0xC1
     TP_REQUEST = 0x20
     TP_REQUEST_NO_RETURN = 0x21
     TP_NOTIFICATION = 0x22
-    TP_RESPONSE = 0xA0
-    TP_ERROR = 0xA1
 
 
 class ReturnCode(enum.IntEnum):
@@ -35,6 +36,11 @@ class ReturnCode(enum.IntEnum):
     E_WRONG_INTERFACE_VERSION = 0x08
     E_MALFORMED_MESSAGE = 0x09
     E_WRONG_MESSAGE_TYPE = 0x0A
+    E_E2E_REPEATED = 0x0B
+    E_E2E_WRONG_SEQUENCE = 0x0C
+    E_E2E = 0x0D
+    E_E2E_NOT_AVAILABLE = 0x0E
+    E_E2E_NO_NEW_DATA = 0x0F
 
 
 class ProtocolVersion(enum.IntEnum):

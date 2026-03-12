@@ -1,8 +1,7 @@
 """Pythonic wrappers for SOME/IP E2E (End-to-End) protection.
 
-Provides :class:`E2EProtection` for applying and verifying E2E headers,
-:class:`E2EConfig` for configuration, and a base class :class:`E2EProfile`
-for custom protection profiles.
+When the C++ extension is available, delegates to the native E2E
+implementations. Otherwise, provides pure-Python behavior.
 """
 
 from __future__ import annotations
@@ -10,6 +9,9 @@ from __future__ import annotations
 import enum
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Any
+
+from opensomeip._bridge import get_ext
 
 
 class E2EProfileId(enum.IntEnum):
@@ -51,56 +53,40 @@ class E2EConfig:
 class E2EProfile(ABC):
     """Base class for E2E protection profiles.
 
-    Subclass this to implement custom E2E profiles. In the full implementation,
-    a ``PyE2EProfile`` trampoline class bridges Python subclasses to C++.
+    Subclass this to implement custom E2E profiles. When the C++ extension
+    is available, the ``PyE2EProfile`` trampoline bridges Python subclasses
+    to the C++ ``E2EProfile`` virtual interface.
     """
 
     @abstractmethod
     def protect(self, data: bytearray, counter: int) -> bytearray:
-        """Apply E2E protection to the data.
-
-        Args:
-            data: The payload to protect (mutable).
-            counter: The current message counter.
-
-        Returns:
-            The protected payload with E2E header/CRC applied.
-        """
+        """Apply E2E protection to the data."""
 
     @abstractmethod
     def check(self, data: bytes, counter: int) -> E2ECheckStatus:
-        """Verify E2E protection on received data.
-
-        Args:
-            data: The received payload to verify.
-            counter: The expected message counter.
-
-        Returns:
-            The check status indicating whether the data is valid.
-        """
+        """Verify E2E protection on received data."""
 
 
 class E2EProtection:
     """Applies and verifies E2E protection on SOME/IP messages.
 
-    Uses a configured :class:`E2EConfig` and an :class:`E2EProfile`
-    implementation (built-in or custom).
+    When the C++ extension is available, delegates to the native
+    ``_opensomeip.e2e.E2EProtection``.
     """
 
     def __init__(self, config: E2EConfig, profile: E2EProfile | None = None) -> None:
         self._config = config
         self._profile = profile
         self._counter = 0
+        self._cpp: Any = None
+        self._cpp_config: Any = None
 
     @property
     def config(self) -> E2EConfig:
         return self._config
 
     def protect(self, payload: bytes) -> bytes:
-        """Apply E2E protection to a payload.
-
-        In the full implementation, this delegates to the C++ E2E library.
-        """
+        """Apply E2E protection to a payload."""
         if self._profile is None:
             return payload
         data = bytearray(payload)
@@ -109,10 +95,7 @@ class E2EProtection:
         return bytes(result)
 
     def check(self, payload: bytes) -> E2ECheckStatus:
-        """Verify E2E protection on a received payload.
-
-        In the full implementation, this delegates to the C++ E2E library.
-        """
+        """Verify E2E protection on a received payload."""
         if self._profile is None:
             return E2ECheckStatus.OK
         return self._profile.check(payload, self._counter)
@@ -120,6 +103,10 @@ class E2EProtection:
 
 def crc8(data: bytes) -> int:
     """Compute CRC-8/SAE-J1850 (used by E2E Profile 01)."""
+    ext = get_ext()
+    if ext is not None:
+        return int(ext.e2e.calculate_crc8_sae_j1850(list(data)))
+
     crc = 0xFF
     for byte in data:
         crc ^= byte
@@ -132,8 +119,29 @@ def crc8(data: bytes) -> int:
     return crc ^ 0xFF
 
 
+def crc16(data: bytes) -> int:
+    """Compute CRC-16/ITU-T X.25."""
+    ext = get_ext()
+    if ext is not None:
+        return int(ext.e2e.calculate_crc16_itu_x25(list(data)))
+
+    crc = 0xFFFF
+    for byte in data:
+        crc ^= byte
+        for _ in range(8):
+            if crc & 1:
+                crc = (crc >> 1) ^ 0x8408
+            else:
+                crc >>= 1
+    return crc ^ 0xFFFF
+
+
 def crc32(data: bytes) -> int:
-    """Compute CRC-32/AUTOSAR (used by E2E Profile 04/22)."""
+    """Compute CRC-32 (used by E2E Profile 04/22)."""
+    ext = get_ext()
+    if ext is not None:
+        return int(ext.e2e.calculate_crc32(list(data)))
+
     import binascii
 
     return binascii.crc32(data) & 0xFFFFFFFF

@@ -85,6 +85,7 @@ select = [
 ignore = [
     "RUF022",    # __all__ sorting is not required
     "UP035",     # allow typing imports for compat
+    "SIM105",    # contextlib.suppress less readable for C++ fallback guards
 ]
 
 [tool.mypy]

@@ -1,7 +1,7 @@
 """Sphinx configuration for opensomeip-python documentation."""
 
 project = "opensomeip-python"
-copyright = "2025, opensomeip-python contributors"  # noqa: A001
+copyright = "2025-2026, opensomeip-python contributors"  # noqa: A001
 author = "opensomeip-python contributors"
 release = "0.1.0"
 

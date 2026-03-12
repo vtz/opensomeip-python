@@ -18,6 +18,11 @@ set(OPENSOMEIP_ENABLE_THREADX OFF CACHE BOOL "" FORCE)
 set(OPENSOMEIP_ENABLE_ZEPHYR OFF CACHE BOOL "" FORCE)
 set(OPENSOMEIP_ENABLE_LWIP OFF CACHE BOOL "" FORCE)
 
+# Disable opensomeip tests/examples when building as submodule
+set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+
 # Build opensomeip C++ library from submodule
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/extern/opensomeip/CMakeLists.txt")
     add_subdirectory(extern/opensomeip)
