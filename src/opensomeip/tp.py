@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 from opensomeip._bridge import get_ext, to_cpp_message
 from opensomeip.message import Message
 from opensomeip.receiver import MessageReceiver
-from opensomeip.transport import Transport
+from opensomeip.transport import Endpoint, Transport
 
 DEFAULT_MTU = 1400
 
@@ -77,7 +77,9 @@ class TpManager:
         self._running = False
         self._reassembly_receiver.close()
 
-    def send(self, message: Message) -> None:
+    def send(
+        self, message: Message, endpoint: Endpoint | None = None
+    ) -> None:
         """Send a message, segmenting it if larger than MTU.
 
         When the C++ extension is available, delegates to the native
@@ -101,16 +103,16 @@ class TpManager:
                             return_code=message.return_code,
                             payload=bytes(segment.payload),
                         )
-                        self._transport.send(seg_msg)
+                        self._transport.send(seg_msg, endpoint)
                     return
                 else:
-                    self._transport.send(message)
+                    self._transport.send(message, endpoint)
                     return
             except Exception:
                 pass
 
         if len(message.payload) <= self._mtu:
-            self._transport.send(message)
+            self._transport.send(message, endpoint)
         else:
             offset = 0
             while offset < len(message.payload):
@@ -122,7 +124,7 @@ class TpManager:
                     return_code=message.return_code,
                     payload=chunk,
                 )
-                self._transport.send(segment)
+                self._transport.send(segment, endpoint)
                 offset += self._mtu
 
     def reassembled(self) -> MessageReceiver:

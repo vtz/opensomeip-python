@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import os
 import signal
-import threading
 
 from opensomeip.message import Message
 from opensomeip.sd import SdConfig, SdServer, ServiceInstance
@@ -31,24 +30,13 @@ INSTANCE_ID = 0x0001
 METHOD_HELLO = 0x0001
 SERVICE_PORT = 30500
 
-stop_event = threading.Event()
-
 
 def main() -> None:
-    signal.signal(signal.SIGINT, lambda *_: stop_event.set())
-    signal.signal(signal.SIGTERM, lambda *_: stop_event.set())
-
     host = os.environ.get("SD_SERVICE_HOST", "127.0.0.1")
     sd_multicast = os.environ.get("SD_MULTICAST", "239.255.255.251")
 
-    # 1) Start the service transport
     transport = UdpTransport(local_endpoint=Endpoint("0.0.0.0", SERVICE_PORT))
-    transport.start()
 
-    print("=== SD Demo Server (Python) ===")
-    print(f"[service] Listening on 0.0.0.0:{SERVICE_PORT}")
-
-    # 2) Start SD and offer the service
     sd_config = SdConfig(
         multicast_endpoint=Endpoint(sd_multicast, 30490),
         unicast_endpoint=Endpoint(host, SERVICE_PORT),
@@ -63,9 +51,22 @@ def main() -> None:
     )
 
     sd = SdServer(sd_config)
+
+    def shutdown(*_: object) -> None:
+        print("\nShutting down...")
+        sd.stop_offer(service)
+        sd.stop()
+        transport.stop()
+
+    signal.signal(signal.SIGINT, shutdown)
+    signal.signal(signal.SIGTERM, shutdown)
+
+    transport.start()
     sd.start()
     sd.offer(service)
 
+    print("=== SD Demo Server (Python) ===")
+    print(f"[service] Listening on 0.0.0.0:{SERVICE_PORT}")
     print(
         f"[sd] Offering service 0x{SERVICE_ID:04X} instance 0x{INSTANCE_ID:04X} "
         f"at {host}:{SERVICE_PORT}"
@@ -73,11 +74,7 @@ def main() -> None:
     print(f"[sd] Multicast on {sd_multicast}:30490")
     print("Press Ctrl+C to stop.\n")
 
-    # 3) Handle incoming requests
     for msg in transport.receiver:
-        if stop_event.is_set():
-            break
-
         if (
             msg.message_id.service_id == SERVICE_ID
             and msg.message_id.method_id == METHOD_HELLO
@@ -94,12 +91,8 @@ def main() -> None:
                 return_code=ReturnCode.E_OK,
                 payload=reply.encode("utf-8"),
             )
-            transport.send(response)
+            transport.send(response, msg.source_endpoint)
 
-    print("\nShutting down...")
-    sd.stop_offer(service)
-    sd.stop()
-    transport.stop()
     print("Server stopped.")
 
 

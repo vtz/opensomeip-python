@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import os
 import signal
-import threading
 
 from opensomeip.message import Message
 from opensomeip.transport import Endpoint, UdpTransport
@@ -30,19 +29,21 @@ from opensomeip.types import MessageId, MessageType, ReturnCode
 HELLO_SERVICE_ID = 0x1000
 SAY_HELLO_METHOD_ID = 0x0001
 
-stop_event = threading.Event()
-
 
 def main() -> None:
-    signal.signal(signal.SIGINT, lambda *_: stop_event.set())
-    signal.signal(signal.SIGTERM, lambda *_: stop_event.set())
-
     bind_host = os.environ.get("HELLO_BIND_HOST", "0.0.0.0")
     bind_port = int(os.environ.get("HELLO_BIND_PORT", "30490"))
 
     transport = UdpTransport(
         local_endpoint=Endpoint(bind_host, bind_port),
     )
+
+    def shutdown(*_: object) -> None:
+        print("\nShutting down...")
+        transport.stop()
+
+    signal.signal(signal.SIGINT, shutdown)
+    signal.signal(signal.SIGTERM, shutdown)
 
     print("=== SOME/IP Hello World Server (Python) ===")
     print(f"Listening on {bind_host}:{bind_port}")
@@ -52,16 +53,13 @@ def main() -> None:
     transport.start()
 
     for msg in transport.receiver:
-        if stop_event.is_set():
-            break
-
         if (
             msg.message_id.service_id == HELLO_SERVICE_ID
             and msg.message_id.method_id == SAY_HELLO_METHOD_ID
             and msg.message_type == MessageType.REQUEST
         ):
             received_text = msg.payload.decode("utf-8", errors="replace")
-            print(f"Client said: '{received_text}'")
+            print(f"Client said: '{received_text}' (from {msg.source_endpoint})")
 
             greeting = f"Hello World! Server received: {received_text}"
             response = Message(
@@ -71,10 +69,9 @@ def main() -> None:
                 return_code=ReturnCode.E_OK,
                 payload=greeting.encode("utf-8"),
             )
-            transport.send(response)
+            transport.send(response, msg.source_endpoint)
             print(f"Sent greeting: '{greeting}'")
 
-    transport.stop()
     print("Server stopped.")
 
 

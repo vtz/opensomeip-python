@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import signal
 import struct
-import threading
 
 from opensomeip.message import Message
 from opensomeip.transport import Endpoint, UdpTransport
@@ -34,7 +33,6 @@ GET_STATS_METHOD_ID = 0x0003
 
 PORT = 30491
 
-stop_event = threading.Event()
 total_calls = 0
 
 
@@ -73,12 +71,16 @@ HANDLERS = {
 
 
 def main() -> None:
-    signal.signal(signal.SIGINT, lambda *_: stop_event.set())
-    signal.signal(signal.SIGTERM, lambda *_: stop_event.set())
-
     transport = UdpTransport(
         local_endpoint=Endpoint("0.0.0.0", PORT),
     )
+
+    def shutdown(*_: object) -> None:
+        print("\nShutting down...")
+        transport.stop()
+
+    signal.signal(signal.SIGINT, shutdown)
+    signal.signal(signal.SIGTERM, shutdown)
 
     print("=== SOME/IP Method Calls Server (Python) ===")
     print(f"Calculator service 0x{CALCULATOR_SERVICE_ID:04X} on port {PORT}")
@@ -91,9 +93,6 @@ def main() -> None:
     transport.start()
 
     for msg in transport.receiver:
-        if stop_event.is_set():
-            break
-
         if (
             msg.message_id.service_id == CALCULATOR_SERVICE_ID
             and msg.message_type == MessageType.REQUEST
@@ -108,9 +107,8 @@ def main() -> None:
                     return_code=ReturnCode.E_OK,
                     payload=result_payload,
                 )
-                transport.send(response)
+                transport.send(response, msg.source_endpoint)
 
-    transport.stop()
     print("Server stopped.")
 
 

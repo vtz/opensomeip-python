@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
 
 from opensomeip.types import MessageId, MessageType, ProtocolVersion, RequestId, ReturnCode
+
+if TYPE_CHECKING:
+    from opensomeip.transport import Endpoint
 
 
 @dataclass(slots=True)
@@ -13,6 +17,10 @@ class Message:
 
     This is a pure-Python representation suitable for serialization across
     gRPC or any other transport.  The ``payload`` is plain ``bytes``.
+
+    ``source_endpoint`` is set by the transport layer when a message is
+    received and indicates the sender's address.  It is ``None`` for
+    locally constructed messages.
     """
 
     message_id: MessageId = field(default_factory=lambda: MessageId(0, 0))
@@ -22,6 +30,7 @@ class Message:
     protocol_version: ProtocolVersion = ProtocolVersion.VERSION_1
     interface_version: int = 1
     payload: bytes = b""
+    source_endpoint: Endpoint | Any | None = None
 
     def __post_init__(self) -> None:
         if not (0 <= self.interface_version <= 0xFF):

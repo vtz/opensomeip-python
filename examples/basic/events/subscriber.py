@@ -19,7 +19,6 @@ from __future__ import annotations
 import os
 import signal
 import struct
-import threading
 
 from opensomeip.events import EventSubscriber
 from opensomeip.transport import Endpoint, UdpTransport
@@ -31,8 +30,6 @@ SENSOR_EVENTGROUP_ID = 0x0001
 
 PORT = int(os.environ.get("SUBSCRIBER_PORT", "30493"))
 
-stop_event = threading.Event()
-
 
 def be_bytes_to_float(data: bytes) -> float:
     """Decode 4 big-endian bytes to an IEEE 754 float."""
@@ -41,11 +38,16 @@ def be_bytes_to_float(data: bytes) -> float:
 
 
 def main() -> None:
-    signal.signal(signal.SIGINT, lambda *_: stop_event.set())
-    signal.signal(signal.SIGTERM, lambda *_: stop_event.set())
-
     transport = UdpTransport(local_endpoint=Endpoint("0.0.0.0", PORT))
     subscriber = EventSubscriber(transport, client_id=0x0001)
+
+    def shutdown(*_: object) -> None:
+        print("\nShutting down...")
+        subscriber.stop()
+        transport.stop()
+
+    signal.signal(signal.SIGINT, shutdown)
+    signal.signal(signal.SIGTERM, shutdown)
 
     subscriber.subscribe(SENSOR_EVENTGROUP_ID)
     transport.start()
@@ -59,9 +61,6 @@ def main() -> None:
 
     receiver = subscriber.notifications()
     for msg in receiver:
-        if stop_event.is_set():
-            break
-
         event_id = msg.message_id.method_id
         if len(msg.payload) < 4:
             print(f"Event 0x{event_id:04X}: Invalid data size ({len(msg.payload)} bytes)")
@@ -76,8 +75,6 @@ def main() -> None:
         else:
             print(f"Unknown event 0x{event_id:04X}: {msg.payload.hex()}")
 
-    subscriber.stop()
-    transport.stop()
     print("Subscriber stopped.")
 
 

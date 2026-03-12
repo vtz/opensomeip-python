@@ -13,7 +13,13 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from typing_extensions import Self
 
-from opensomeip._bridge import from_cpp_message, get_ext, to_cpp_endpoint, to_cpp_message
+from opensomeip._bridge import (
+    from_cpp_endpoint,
+    from_cpp_message,
+    get_ext,
+    to_cpp_endpoint,
+    to_cpp_message,
+)
 from opensomeip.exceptions import TransportError
 from opensomeip.message import Message
 from opensomeip.receiver import MessageReceiver
@@ -49,6 +55,10 @@ class _NativeTransportListener:
         class _Listener(ext.ITransportListener):  # type: ignore[name-defined,misc]
             def on_message_received(self, message: Any, sender: Any) -> None:
                 py_msg = from_cpp_message(message)
+                try:
+                    py_msg.source_endpoint = from_cpp_endpoint(sender)
+                except Exception:
+                    pass
                 parent._receiver.put(py_msg)
 
             def on_connection_lost(self, endpoint: Any) -> None:
@@ -114,7 +124,13 @@ class Transport:
             return
         if self._cpp is not None:
             try:
-                self._cpp.start()
+                result = self._cpp.start()
+                if hasattr(result, "name") and result.name != "SUCCESS":
+                    raise TransportError(
+                        f"Native transport failed to start: {result.name}"
+                    )
+            except TransportError:
+                raise
             except Exception:
                 pass
         self._running = True
@@ -135,6 +151,8 @@ class Transport:
         if self._cpp is not None:
             cpp_msg = to_cpp_message(message)
             target = endpoint or self._remote
+            if target is None and hasattr(message, "source_endpoint"):
+                target = message.source_endpoint
             if target is not None:
                 cpp_ep = to_cpp_endpoint(target)
                 self._cpp.send_message(cpp_msg, cpp_ep)

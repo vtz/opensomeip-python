@@ -46,7 +46,9 @@ def main() -> None:
     signal.signal(signal.SIGTERM, lambda *_: stop_event.set())
 
     transport = UdpTransport(local_endpoint=Endpoint("0.0.0.0", PORT))
-    publisher = EventPublisher(transport, service_id=SENSOR_SERVICE_ID, instance_id=0x0001)
+    publisher = EventPublisher(
+        transport, service_id=SENSOR_SERVICE_ID, instance_id=0x0001
+    )
 
     publisher.register_event(TEMPERATURE_EVENT_ID, SENSOR_EVENTGROUP_ID)
     publisher.register_event(SPEED_EVENT_ID, SENSOR_EVENTGROUP_ID)
@@ -80,6 +82,7 @@ def main() -> None:
 
         stop_event.wait(0.1)
 
+    print("\nShutting down...")
     publisher.stop()
     transport.stop()
     print("Publisher stopped.")

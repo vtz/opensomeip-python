@@ -22,7 +22,6 @@ Interop:
 from __future__ import annotations
 
 import signal
-import threading
 from dataclasses import dataclass
 
 from opensomeip.message import Message
@@ -36,9 +35,6 @@ GET_SENSOR_ARRAY = 0x0002
 ECHO_COMPLEX_STRUCT = 0x0003
 
 PORT = 30494
-
-stop_event = threading.Event()
-
 
 @dataclass
 class VehicleData:
@@ -142,10 +138,14 @@ HANDLERS = {
 
 
 def main() -> None:
-    signal.signal(signal.SIGINT, lambda *_: stop_event.set())
-    signal.signal(signal.SIGTERM, lambda *_: stop_event.set())
-
     transport = UdpTransport(local_endpoint=Endpoint("0.0.0.0", PORT))
+
+    def shutdown(*_: object) -> None:
+        print("\nShutting down...")
+        transport.stop()
+
+    signal.signal(signal.SIGINT, shutdown)
+    signal.signal(signal.SIGTERM, shutdown)
 
     print("=== SOME/IP Complex Types Server (Python) ===")
     print(f"Service 0x{COMPLEX_SERVICE_ID:04X} on port {PORT}")
@@ -158,9 +158,6 @@ def main() -> None:
     transport.start()
 
     for msg in transport.receiver:
-        if stop_event.is_set():
-            break
-
         if (
             msg.message_id.service_id == COMPLEX_SERVICE_ID
             and msg.message_type == MessageType.REQUEST
@@ -175,7 +172,7 @@ def main() -> None:
                     return_code=ReturnCode.E_OK,
                     payload=result_payload,
                 )
-                transport.send(response)
+                transport.send(response, msg.source_endpoint)
 
     transport.stop()
     print("Server stopped.")

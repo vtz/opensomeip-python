@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import signal
 import struct
-import threading
 
 from opensomeip.message import Message
 from opensomeip.tp import TpManager
@@ -34,9 +33,6 @@ RECEIVE_LARGE_DATA = 0x0002
 ECHO_LARGE_DATA = 0x0003
 
 PORT = 30495
-
-stop_event = threading.Event()
-
 
 def generate_test_data(size: int) -> bytes:
     """Generate a repeating 0x00..0xFF pattern of the given size."""
@@ -79,11 +75,16 @@ HANDLERS = {
 
 
 def main() -> None:
-    signal.signal(signal.SIGINT, lambda *_: stop_event.set())
-    signal.signal(signal.SIGTERM, lambda *_: stop_event.set())
-
     transport = UdpTransport(local_endpoint=Endpoint("0.0.0.0", PORT))
     tp = TpManager(transport=transport, mtu=1400)
+
+    def shutdown(*_: object) -> None:
+        print("\nShutting down...")
+        tp.stop()
+        transport.stop()
+
+    signal.signal(signal.SIGINT, shutdown)
+    signal.signal(signal.SIGTERM, shutdown)
 
     print("=== SOME/IP Large Messages Server (Python) ===")
     print(f"Service 0x{LARGE_DATA_SERVICE_ID:04X} on port {PORT}")
@@ -97,9 +98,6 @@ def main() -> None:
     tp.start()
 
     for msg in transport.receiver:
-        if stop_event.is_set():
-            break
-
         if (
             msg.message_id.service_id == LARGE_DATA_SERVICE_ID
             and msg.message_type == MessageType.REQUEST
@@ -114,7 +112,7 @@ def main() -> None:
                     return_code=ReturnCode.E_OK,
                     payload=result_payload,
                 )
-                tp.send(response)
+                tp.send(response, endpoint=msg.source_endpoint)
 
     tp.stop()
     transport.stop()
