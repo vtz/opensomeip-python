@@ -178,22 +178,27 @@ class TestSdCoverage:
         server = SdServer(sd_config)
         assert server.config is sd_config
 
-    def test_sd_server_get_statistics_returns_none(self, sd_config: SdConfig) -> None:
-        """get_statistics returns None when C++ extension is unavailable."""
+    def test_sd_server_get_statistics(self, sd_config: SdConfig) -> None:
+        """get_statistics returns a value (None without C++, Statistics with)."""
         server = SdServer(sd_config)
-        # When ext is None, _cpp is None, so get_statistics returns None
         result = server.get_statistics()
-        assert result is None
+        if server._cpp is None:
+            assert result is None
+        else:
+            assert result is not None
 
     def test_sd_client_config_property(self, sd_config: SdConfig) -> None:
         client = SdClient(sd_config)
         assert client.config is sd_config
 
-    def test_sd_client_get_statistics_returns_none(self, sd_config: SdConfig) -> None:
-        """get_statistics returns None when C++ extension is unavailable."""
+    def test_sd_client_get_statistics(self, sd_config: SdConfig) -> None:
+        """get_statistics returns a value (None without C++, Statistics with)."""
         client = SdClient(sd_config)
         result = client.get_statistics()
-        assert result is None
+        if client._cpp is None:
+            assert result is None
+        else:
+            assert result is not None
 
     @pytest.mark.asyncio
     async def test_sd_client_async_context_manager(self, sd_config: SdConfig) -> None:
