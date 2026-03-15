@@ -11,6 +11,7 @@ without compilation), ``HAS_NATIVE`` is ``False`` and all ``to_cpp_*`` /
 from __future__ import annotations
 
 import functools
+import warnings
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -32,8 +33,19 @@ def _load_extension() -> Any:
         _ext = _opensomeip
         HAS_NATIVE = True
         return _ext
-    except ImportError:
+    except ImportError as exc:
         HAS_NATIVE = False
+        _msg = (
+            f"opensomeip C++ extension failed to load: {exc}\n"
+            "Transport classes will run as no-op stubs (no sockets will be opened).\n"
+            "On macOS, this is often caused by a libc++ ABI mismatch when building "
+            "from source with a non-system compiler (e.g. Homebrew LLVM). "
+            "Rebuild with the system compiler:\n"
+            "  CC=/usr/bin/clang CXX=/usr/bin/clang++ "
+            "pip install --no-cache-dir --force-reinstall --no-binary=opensomeip opensomeip\n"
+            "See https://github.com/vtz/opensomeip-python#troubleshooting for details."
+        )
+        warnings.warn(_msg, ImportWarning, stacklevel=2)
         return None
 
 

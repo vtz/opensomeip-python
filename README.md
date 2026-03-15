@@ -177,6 +177,52 @@ and type checking.
 | `opensomeip.client` | `SomeIpClient` — high-level client composing all components |
 | `opensomeip.receiver` | `MessageReceiver` — sync/async message iterator |
 
+## Troubleshooting
+
+### macOS: C++ extension fails to load (`ImportError` / symbol not found)
+
+When installing from source on macOS (e.g. `pip install opensomeip` on a Python
+version for which no pre-built wheel is available), the C++ extension may fail to
+load at runtime with an error like:
+
+```
+ImportError: dlopen(…/_opensomeip.cpython-3xx-darwin.so, 0x0002):
+  symbol not found in flat namespace '__ZNSt3__113__hash_memoryEPKvm'
+```
+
+**Cause:** If [Homebrew LLVM](https://formulae.brew.sh/formula/llvm) is installed
+and its `clang++` appears in `PATH` before `/usr/bin/clang++`, CMake will use it
+during the build. Homebrew's compiler ships a newer libc++ than the one bundled
+with macOS, so the compiled extension references symbols that don't exist in the
+system library loaded at runtime.
+
+**Fix — rebuild with the system compiler:**
+
+```bash
+CC=/usr/bin/clang CXX=/usr/bin/clang++ \
+  pip install --no-cache-dir --force-reinstall --no-binary=opensomeip opensomeip
+```
+
+**Tip:** Pre-built wheels (available for Python 3.10 – 3.14 on macOS, Linux, and
+Windows) are compiled in CI with the correct toolchain and don't have this issue.
+If a wheel exists for your platform you'll never hit this problem — it only
+occurs when pip falls back to building from the source distribution.
+
+### Silent no-op transport (no socket opened)
+
+If the C++ extension fails to load, the library warns via Python's
+`warnings` module and falls back to stub transport classes. These stubs
+set `is_running = True` but **do not open any network sockets**. If your
+server appears to start but `lsof` shows no listening socket, check for the
+`ImportWarning` that opensomeip emits at import time:
+
+```bash
+python -W all your_script.py
+```
+
+If you see the warning, follow the steps in the section above to fix the
+extension build.
+
 ## Development
 
 ```bash
