@@ -231,7 +231,6 @@ class TestTransportCoverage:
         t._cpp = mock_cpp
         msg = Message(payload=b"test")
         msg.source_endpoint = Endpoint("192.168.1.1", 30490)
-        # Patch to_cpp_* when extension may be unavailable
         mock_cpp_msg = MagicMock()
         mock_cpp_ep = MagicMock()
         with (
@@ -256,10 +255,6 @@ class TestTpCoverage:
         tp = __import__("opensomeip.tp", fromlist=["TpManager"]).TpManager
         manager = tp(t, mtu=100)
         manager.start()
-        # With ext possibly available, we need to force pure-Python path.
-        # When ext is None, _cpp is None, so the else branch (lines 112-126) runs.
-        # When ext is available, the try block runs. To hit pure-Python path,
-        # we can patch _cpp to None.
         with patch.object(manager, "_cpp", None):
             msg = Message(
                 message_id=MessageId(0x1234, 0x0001),
