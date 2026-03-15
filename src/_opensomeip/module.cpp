@@ -16,7 +16,7 @@ void init_exceptions(py::module_& m);
 
 PYBIND11_MODULE(_opensomeip, m) {
     m.doc() = "Python bindings for the opensomeip C++ SOME/IP stack";
-    m.attr("__version__") = "0.1.0";
+    m.attr("__version__") = "0.1.1";
 
     init_exceptions(m);
     init_types(m);
