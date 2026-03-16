@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- towncrier release notes start -->
 
+## [0.1.2](https://github.com/vtz/opensomeip-python/releases/tag/v0.1.2) - 2026-03-15
+
+### Bug Fixes
+
+- Disable C++ extension in unit tests to prevent native transport `start()`
+  from blocking on Windows during cibuildwheel test runs. Unit tests now always
+  exercise the pure-Python path via an autouse conftest fixture.
+- Trigger wheel builds on tag push instead of release event, fixing wheels not
+  being built on new releases.
+
+### Miscellaneous
+
+- Bump `actions/checkout` from 4 to 6.
+
 ## [0.1.1](https://github.com/vtz/opensomeip-python/releases/tag/v0.1.1) - 2026-03-13
 
 ### Bug Fixes
