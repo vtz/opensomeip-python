@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- towncrier release notes start -->
 
+## [0.1.3](https://github.com/vtz/opensomeip-python/releases/tag/v0.1.3) - 2026-03-30
+
+### Miscellaneous
+
+- Update opensomeip C++ submodule to v0.0.4.
+
 ## [0.1.2](https://github.com/vtz/opensomeip-python/releases/tag/v0.1.2) - 2026-03-15
 
 ### Bug Fixes
