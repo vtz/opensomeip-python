@@ -47,12 +47,17 @@ class ClientConfig:
         - feat_req_someip_850-854: TCP transport configuration
         - feat_req_someiptp_403: TP segment size negotiation
         - feat_req_someip_102-103: E2E protection configuration
+
+    When ``remote_endpoint`` is set, the transport is configured with a
+    static remote peer address, bypassing Service Discovery.  This is
+    useful for ECUs that do not run SOME/IP-SD.
     """
 
     local_endpoint: Endpoint
     sd_config: SdConfig
     transport_mode: TransportMode = TransportMode.UDP
     multicast_group: str | None = None
+    remote_endpoint: Endpoint | None = None
     enable_tp: bool = False
     tp_mtu: int = 1400
     e2e_config: E2EConfig | None = None
@@ -86,10 +91,12 @@ class SomeIpClient:
         if config.transport_mode == TransportMode.TCP:
             self._transport: Transport = TcpTransport(
                 config.local_endpoint,
+                config.remote_endpoint,
             )
         else:
             self._transport = UdpTransport(
                 config.local_endpoint,
+                config.remote_endpoint,
                 multicast_group=config.multicast_group,
             )
 

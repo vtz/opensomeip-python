@@ -210,6 +210,61 @@ class TestTpIntegration:
             client.send(msg)
 
 
+class TestStaticRemoteEndpoint:
+    """Static remote endpoint support (no Service Discovery)."""
+
+    def test_remote_endpoint_defaults_to_none(self, client_config: ClientConfig) -> None:
+        assert client_config.remote_endpoint is None
+
+    def test_udp_remote_endpoint_forwarded(self) -> None:
+        remote = Endpoint("192.168.100.10", 30490)
+        cfg = ClientConfig(
+            local_endpoint=Endpoint("0.0.0.0", 0),
+            sd_config=SdConfig(
+                multicast_endpoint=Endpoint("239.1.1.1", 30490),
+                unicast_endpoint=Endpoint("192.168.1.200", 30490),
+            ),
+            remote_endpoint=remote,
+        )
+        client = SomeIpClient(cfg)
+        assert isinstance(client.transport, UdpTransport)
+        assert client.transport.remote_endpoint == remote
+
+    def test_tcp_remote_endpoint_forwarded(self) -> None:
+        remote = Endpoint("192.168.100.10", 30490)
+        cfg = ClientConfig(
+            local_endpoint=Endpoint("0.0.0.0", 0),
+            sd_config=SdConfig(
+                multicast_endpoint=Endpoint("239.1.1.1", 30490),
+                unicast_endpoint=Endpoint("192.168.1.200", 30490),
+            ),
+            transport_mode=TransportMode.TCP,
+            remote_endpoint=remote,
+        )
+        client = SomeIpClient(cfg)
+        assert isinstance(client.transport, TcpTransport)
+        assert client.transport.remote_endpoint == remote
+
+    def test_no_remote_endpoint_preserves_none(self, client_config: ClientConfig) -> None:
+        client = SomeIpClient(client_config)
+        assert client.transport.remote_endpoint is None
+
+    def test_lifecycle_with_remote_endpoint(self) -> None:
+        remote = Endpoint("192.168.100.10", 30490)
+        cfg = ClientConfig(
+            local_endpoint=Endpoint("0.0.0.0", 0),
+            sd_config=SdConfig(
+                multicast_endpoint=Endpoint("239.1.1.1", 30490),
+                unicast_endpoint=Endpoint("192.168.1.200", 30490),
+            ),
+            remote_endpoint=remote,
+        )
+        with SomeIpClient(cfg) as client:
+            assert client.is_running is True
+            assert client.transport.remote_endpoint == remote
+        assert client.is_running is False
+
+
 class TestE2EIntegration:
     """feat_req_someip_102-103: E2E protection integration."""
 
