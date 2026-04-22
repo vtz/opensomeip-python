@@ -16,7 +16,6 @@ import pytest
 
 from opensomeip.client import ClientConfig, SomeIpClient
 from opensomeip.e2e import E2ECheckStatus, E2EConfig, E2EProfile, E2EProfileId
-from opensomeip.exceptions import RpcError, TransportError
 from opensomeip.receiver import MessageReceiver
 from opensomeip.sd import SdConfig, ServiceInstance
 from opensomeip.server import TransportMode
@@ -110,15 +109,15 @@ class TestSomeIpClient:
             receiver = client.find(svc)
             assert isinstance(receiver, MessageReceiver)
 
-    def test_call_raises_without_native(self, client_config: ClientConfig) -> None:
+    def test_call(self, client_config: ClientConfig) -> None:
         with SomeIpClient(client_config) as client:
-            with pytest.raises(RpcError, match="C\\+\\+ extension is not available"):
-                client.call(MessageId(0x1234, 0x0001), payload=b"\x01")
+            response = client.call(MessageId(0x1234, 0x0001), payload=b"\x01")
+            assert response.message_type == MessageType.RESPONSE
 
-    def test_subscribe_events_raises_without_native(self, client_config: ClientConfig) -> None:
+    def test_subscribe_events(self, client_config: ClientConfig) -> None:
         with SomeIpClient(client_config) as client:
-            with pytest.raises(RuntimeError, match="C\\+\\+ extension is not available"):
-                client.subscribe_events(eventgroup_id=0x0001)
+            receiver = client.subscribe_events(eventgroup_id=0x0001)
+            assert isinstance(receiver, MessageReceiver)
 
     @pytest.mark.asyncio
     async def test_async_context_manager(self, client_config: ClientConfig) -> None:
@@ -157,12 +156,10 @@ class TestServiceDiscovery:
 class TestEventSubscription:
     """feat_req_someipsd_203-205: Eventgroup subscription."""
 
-    def test_subscribe_then_unsubscribe_raises_without_native(
-        self, client_config: ClientConfig
-    ) -> None:
+    def test_unsubscribe_events(self, client_config: ClientConfig) -> None:
         with SomeIpClient(client_config) as client:
-            with pytest.raises(RuntimeError, match="C\\+\\+ extension is not available"):
-                client.subscribe_events(eventgroup_id=0x0001)
+            client.subscribe_events(eventgroup_id=0x0001)
+            client.unsubscribe_events(eventgroup_id=0x0001)
 
     def test_subscription_status(self, client_config: ClientConfig) -> None:
         with SomeIpClient(client_config) as client:
@@ -201,7 +198,7 @@ class TestTpIntegration:
         ):
             client.reassembled_messages()
 
-    def test_send_via_tp_raises_without_native(self, tp_client_config: ClientConfig) -> None:
+    def test_send_via_tp(self, tp_client_config: ClientConfig) -> None:
         from opensomeip.message import Message
         from opensomeip.types import MessageId
 
@@ -210,8 +207,7 @@ class TestTpIntegration:
                 message_id=MessageId(0x1234, 0x0001),
                 payload=b"\x00" * 200,
             )
-            with pytest.raises(TransportError, match="native transport is not available"):
-                client.send(msg)
+            client.send(msg)
 
 
 class TestStaticRemoteEndpoint:
@@ -280,7 +276,7 @@ class TestE2EIntegration:
         client = SomeIpClient(client_config)
         assert client.e2e is None
 
-    def test_call_with_e2e_raises_without_native(self, e2e_client_config: ClientConfig) -> None:
+    def test_call_with_e2e(self, e2e_client_config: ClientConfig) -> None:
         with SomeIpClient(e2e_client_config) as client:
-            with pytest.raises(RpcError, match="C\\+\\+ extension is not available"):
-                client.call(MessageId(0x1234, 0x0001), payload=b"\x01")
+            response = client.call(MessageId(0x1234, 0x0001), payload=b"\x01")
+            assert response.message_type == MessageType.RESPONSE

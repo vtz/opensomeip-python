@@ -255,7 +255,7 @@ class TestTpCoverage:
         tp = __import__("opensomeip.tp", fromlist=["TpManager"]).TpManager
         manager = tp(t, mtu=100)
         manager.start()
-        with patch.object(manager, "_cpp", None), patch.object(t, "send"):
+        with patch.object(manager, "_cpp", None):
             msg = Message(
                 message_id=MessageId(0x1234, 0x0001),
                 payload=b"x" * 250,

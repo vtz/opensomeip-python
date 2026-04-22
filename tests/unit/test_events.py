@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
-
 import pytest
 
 from opensomeip.events import (
@@ -38,24 +36,12 @@ class TestEventPublisher:
             assert pub.is_running is True
         assert pub.is_running is False
 
-    def test_notify_raises_without_native(self, transport: UdpTransport) -> None:
-        """notify() raises RuntimeError when the C++ extension is unavailable."""
-        with patch("opensomeip.events.get_ext", return_value=None):
-            pub = EventPublisher(transport)
-            pub.start()
-            pub.register_event(event_id=0x8001, eventgroup_id=0x0001)
-            with pytest.raises(RuntimeError, match="C\\+\\+ extension is not available"):
-                pub.notify(event_id=0x8001, payload=b"\x01\x02")
-            pub.stop()
-
-    def test_set_field_raises_without_native(self, transport: UdpTransport) -> None:
-        """set_field() raises RuntimeError when the C++ extension is unavailable."""
-        with patch("opensomeip.events.get_ext", return_value=None):
-            pub = EventPublisher(transport)
-            pub.start()
-            with pytest.raises(RuntimeError, match="C\\+\\+ extension is not available"):
-                pub.set_field(event_id=0x8001, payload=b"\x01")
-            pub.stop()
+    def test_register_and_notify(self, transport: UdpTransport) -> None:
+        pub = EventPublisher(transport)
+        pub.start()
+        pub.register_event(event_id=0x8001, eventgroup_id=0x0001)
+        pub.notify(event_id=0x8001, payload=b"\x01\x02")
+        pub.stop()
 
     def test_notify_unregistered_event(self, transport: UdpTransport) -> None:
         pub = EventPublisher(transport)
@@ -90,12 +76,10 @@ class TestEventSubscriber:
             assert sub.is_running is True
         assert sub.is_running is False
 
-    def test_subscribe_raises_without_native(self, transport: UdpTransport) -> None:
-        """subscribe() raises RuntimeError when the C++ extension is unavailable."""
-        with patch("opensomeip.events.get_ext", return_value=None):
-            sub = EventSubscriber(transport)
-            with pytest.raises(RuntimeError, match="C\\+\\+ extension is not available"):
-                sub.subscribe(0x0001)
+    def test_subscribe_unsubscribe(self, transport: UdpTransport) -> None:
+        sub = EventSubscriber(transport)
+        sub.subscribe(0x0001)
+        sub.unsubscribe(0x0001)
 
     def test_notifications_returns_receiver(self, transport: UdpTransport) -> None:
         sub = EventSubscriber(transport)

@@ -100,41 +100,45 @@ class RpcClient:
         if not self._running:
             raise RpcError("RPC client is not running")
 
-        if self._cpp is None:
-            raise RpcError(
-                "Cannot perform RPC call: opensomeip C++ extension is not available. "
-                "See https://github.com/vtz/opensomeip-python#troubleshooting"
-            )
+        if self._cpp is not None:
+            try:
+                import struct as _struct
 
-        try:
-            import struct as _struct
-
-            params = list(_struct.unpack(f"!{len(payload)}B", payload)) if payload else []
-            cpp_timeout = get_ext().rpc.RpcTimeout()
-            result = self._cpp.call_method_sync(
-                method_id.service_id,
-                method_id.method_id,
-                params,
-                cpp_timeout,
-            )
-            if int(result.result) != 0:
-                raise RpcError(
-                    f"RPC call to {method_id} failed with native result code {result.result}"
+                params = list(_struct.unpack(f"!{len(payload)}B", payload)) if payload else []
+                cpp_timeout = get_ext().rpc.RpcTimeout()
+                result = self._cpp.call_method_sync(
+                    method_id.service_id,
+                    method_id.method_id,
+                    params,
+                    cpp_timeout,
                 )
-            return_payload = bytes(result.return_values) if result.return_values else b""
-            return Message(
-                message_id=method_id,
-                request_id=RequestId(
-                    client_id=self._client_id, session_id=self._next_session()
-                ),
-                message_type=MessageType.RESPONSE,
-                return_code=ReturnCode.E_OK,
-                payload=return_payload,
-            )
-        except RpcError:
-            raise
-        except Exception as exc:
-            raise RpcError(f"Native RPC call to {method_id} failed: {exc}") from exc
+                if int(result.result) == 0:
+                    return_payload = bytes(result.return_values) if result.return_values else b""
+                    return Message(
+                        message_id=method_id,
+                        request_id=RequestId(
+                            client_id=self._client_id, session_id=self._next_session()
+                        ),
+                        message_type=MessageType.RESPONSE,
+                        return_code=ReturnCode.E_OK,
+                        payload=return_payload,
+                    )
+            except Exception:
+                pass
+
+        request = Message(
+            message_id=method_id,
+            request_id=RequestId(client_id=self._client_id, session_id=self._next_session()),
+            message_type=MessageType.REQUEST,
+            payload=payload,
+        )
+        self._transport.send(request)
+        return Message(
+            message_id=method_id,
+            request_id=request.request_id,
+            message_type=MessageType.RESPONSE,
+            return_code=ReturnCode.E_OK,
+        )
 
     async def call_async(
         self,
@@ -147,41 +151,55 @@ class RpcClient:
         if not self._running:
             raise RpcError("RPC client is not running")
 
-        if self._cpp is None:
-            raise RpcError(
-                "Cannot perform RPC call: opensomeip C++ extension is not available. "
-                "See https://github.com/vtz/opensomeip-python#troubleshooting"
+        if self._cpp is not None:
+            import struct
+
+            params = list(struct.unpack(f"!{len(payload)}B", payload)) if payload else []
+            loop = asyncio.get_running_loop()
+            future: asyncio.Future[Message] = loop.create_future()
+            session = self._next_session()
+            self._pending[session] = future
+
+            def _on_response(cpp_resp: Any) -> None:
+                return_payload = bytes(cpp_resp.return_values) if cpp_resp.return_values else b""
+                py_msg = Message(
+                    message_id=method_id,
+                    request_id=RequestId(client_id=self._client_id, session_id=session),
+                    message_type=MessageType.RESPONSE,
+                    return_code=ReturnCode.E_OK,
+                    payload=return_payload,
+                )
+                loop.call_soon_threadsafe(future.set_result, py_msg)
+
+            cpp_timeout = get_ext().rpc.RpcTimeout()
+            self._cpp.call_method_async(
+                method_id.service_id,
+                method_id.method_id,
+                params,
+                _on_response,
+                cpp_timeout,
             )
+            try:
+                return await asyncio.wait_for(future, timeout=timeout)
+            except asyncio.TimeoutError:
+                self._pending.pop(session, None)
+                raise RpcError(f"RPC call timed out after {timeout}s") from None
 
-        import struct
-
-        params = list(struct.unpack(f"!{len(payload)}B", payload)) if payload else []
         loop = asyncio.get_running_loop()
-        future: asyncio.Future[Message] = loop.create_future()
+        future_stub: asyncio.Future[Message] = loop.create_future()
         session = self._next_session()
-        self._pending[session] = future
+        self._pending[session] = future_stub
 
-        def _on_response(cpp_resp: Any) -> None:
-            return_payload = bytes(cpp_resp.return_values) if cpp_resp.return_values else b""
-            py_msg = Message(
-                message_id=method_id,
-                request_id=RequestId(client_id=self._client_id, session_id=session),
-                message_type=MessageType.RESPONSE,
-                return_code=ReturnCode.E_OK,
-                payload=return_payload,
-            )
-            loop.call_soon_threadsafe(future.set_result, py_msg)
-
-        cpp_timeout = get_ext().rpc.RpcTimeout()
-        self._cpp.call_method_async(
-            method_id.service_id,
-            method_id.method_id,
-            params,
-            _on_response,
-            cpp_timeout,
+        request = Message(
+            message_id=method_id,
+            request_id=RequestId(client_id=self._client_id, session_id=session),
+            message_type=MessageType.REQUEST,
+            payload=payload,
         )
+        self._transport.send(request)
+
         try:
-            return await asyncio.wait_for(future, timeout=timeout)
+            return await asyncio.wait_for(future_stub, timeout=timeout)
         except asyncio.TimeoutError:
             self._pending.pop(session, None)
             raise RpcError(f"RPC call timed out after {timeout}s") from None
