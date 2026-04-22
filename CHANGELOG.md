@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- towncrier release notes start -->
 
+## [0.1.5](https://github.com/vtz/opensomeip-python/releases/tag/v0.1.5) - 2026-05-24
+
+### Features
+
+- Update opensomeip C++ submodule to **v0.1.0**. Adapt pybind11 bindings to
+  upstream API changes:
+  - SD: `ServiceInstance.minor_version` widened to 32-bit, `EventGroupSubscription`
+    gains `major_version`, `offer_service` accepts `eventgroup_ids`.
+  - Events: expose `EventPublisher.set_default_client_endpoint`,
+    `EventSubscriber.set_default_endpoint` and `set_endpoint_resolver`.
+  - Transport: expose TCP Magic Cookie config and static helpers.
+  (Closes #21)
+
+### Bug Fixes
+
+- Operations that require the native C++ extension (RPC calls, transport send,
+  event subscriptions) now raise clear errors (`RpcError`, `TransportError`,
+  `RuntimeError`) instead of silently returning empty/fake responses or dropping
+  messages when the extension is unavailable. (Fixes #17)
+
+### Documentation
+
+- Add "Verify native extension" subsection to the README after Installation.
+- Update the Troubleshooting section to describe the new error-raising behavior.
+
+### Miscellaneous
+
+- Add `.hypothesis/` and `uv.lock` to `.gitignore`.
+
 ## [0.1.4](https://github.com/vtz/opensomeip-python/releases/tag/v0.1.4) - 2026-04-18
 
 ### Features
