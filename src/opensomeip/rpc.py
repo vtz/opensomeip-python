@@ -124,9 +124,7 @@ class RpcClient:
             return_payload = bytes(result.return_values) if result.return_values else b""
             return Message(
                 message_id=method_id,
-                request_id=RequestId(
-                    client_id=self._client_id, session_id=self._next_session()
-                ),
+                request_id=RequestId(client_id=self._client_id, session_id=self._next_session()),
                 message_type=MessageType.RESPONSE,
                 return_code=ReturnCode.E_OK,
                 payload=return_payload,
