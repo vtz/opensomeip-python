@@ -96,32 +96,29 @@ class EventPublisher:
 
     def notify(self, event_id: int, payload: bytes) -> None:
         """Publish a notification for a registered event."""
-        from opensomeip.message import Message
-        from opensomeip.types import MessageType, ReturnCode
-
         if event_id not in self._registered_events:
             from opensomeip.exceptions import ConfigurationError
 
             raise ConfigurationError(f"Event {event_id:#06x} is not registered")
 
-        if self._cpp is not None:
-            data = list(payload)
-            self._cpp.publish_event(event_id, data)
-            return
+        if self._cpp is None:
+            raise RuntimeError(
+                "Cannot publish events: opensomeip C++ extension is not available. "
+                "See https://github.com/vtz/opensomeip-python#troubleshooting"
+            )
 
-        msg = Message(
-            message_id=MessageId(service_id=0, method_id=event_id),
-            message_type=MessageType.NOTIFICATION,
-            return_code=ReturnCode.E_OK,
-            payload=payload,
-        )
-        self._transport.send(msg)
+        data = list(payload)
+        self._cpp.publish_event(event_id, data)
 
     def set_field(self, event_id: int, payload: bytes) -> None:
         """Set the value of a field event (getter/setter pattern)."""
-        if self._cpp is not None:
-            data = list(payload)
-            self._cpp.publish_field(event_id, data)
+        if self._cpp is None:
+            raise RuntimeError(
+                "Cannot set field: opensomeip C++ extension is not available. "
+                "See https://github.com/vtz/opensomeip-python#troubleshooting"
+            )
+        data = list(payload)
+        self._cpp.publish_field(event_id, data)
 
     def get_statistics(self) -> Any:
         """Return event publisher statistics (native only)."""
@@ -203,28 +200,33 @@ class EventSubscriber:
         """Subscribe to an event group."""
         self._subscribed_groups.add(eventgroup_id)
 
-        if self._cpp is not None:
-            receiver = self._notification_receiver
-
-            def _on_notification(cpp_notif: Any) -> None:
-                from opensomeip.message import Message
-
-                payload = bytes(cpp_notif.event_data) if cpp_notif.event_data else b""
-                msg = Message(
-                    message_id=MessageId(
-                        service_id=cpp_notif.service_id,
-                        method_id=cpp_notif.event_id,
-                    ),
-                    payload=payload,
-                )
-                receiver.put(msg)
-
-            self._cpp.subscribe_eventgroup(
-                service_id,
-                instance_id,
-                eventgroup_id,
-                _on_notification,
+        if self._cpp is None:
+            raise RuntimeError(
+                "Cannot subscribe to events: opensomeip C++ extension is not available. "
+                "See https://github.com/vtz/opensomeip-python#troubleshooting"
             )
+
+        receiver = self._notification_receiver
+
+        def _on_notification(cpp_notif: Any) -> None:
+            from opensomeip.message import Message
+
+            payload = bytes(cpp_notif.event_data) if cpp_notif.event_data else b""
+            msg = Message(
+                message_id=MessageId(
+                    service_id=cpp_notif.service_id,
+                    method_id=cpp_notif.event_id,
+                ),
+                payload=payload,
+            )
+            receiver.put(msg)
+
+        self._cpp.subscribe_eventgroup(
+            service_id,
+            instance_id,
+            eventgroup_id,
+            _on_notification,
+        )
 
     def unsubscribe(
         self,

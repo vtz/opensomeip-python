@@ -15,6 +15,7 @@ from __future__ import annotations
 import pytest
 
 from opensomeip.e2e import E2ECheckStatus, E2EConfig, E2EProfile, E2EProfileId
+from opensomeip.exceptions import TransportError
 from opensomeip.message import Message
 from opensomeip.sd import SdConfig, ServiceInstance
 from opensomeip.server import ServerConfig, SomeIpServer, TransportMode
@@ -118,10 +119,13 @@ class TestSomeIpServer:
 
         server.register_method(method, handler)
 
-    def test_register_event_and_publish(self, server_config: ServerConfig) -> None:
+    def test_register_event_and_publish_raises_without_native(
+        self, server_config: ServerConfig
+    ) -> None:
         with SomeIpServer(server_config) as server:
             server.register_event(event_id=0x8001, eventgroup_id=0x0001)
-            server.publish_event(event_id=0x8001, payload=b"\x01")
+            with pytest.raises(RuntimeError, match="C\\+\\+ extension is not available"):
+                server.publish_event(event_id=0x8001, payload=b"\x01")
 
     @pytest.mark.asyncio
     async def test_async_context_manager(self, server_config: ServerConfig) -> None:
@@ -189,21 +193,23 @@ class TestTpIntegration:
         assert server.tp_manager is not None
         assert server.tp_manager.is_running is False
 
-    def test_send_via_tp(self, tp_server_config: ServerConfig) -> None:
+    def test_send_via_tp_raises_without_native(self, tp_server_config: ServerConfig) -> None:
         with SomeIpServer(tp_server_config) as server:
             msg = Message(
                 message_id=MessageId(0x1234, 0x0001),
                 payload=b"\x00" * 200,
             )
-            server.send(msg)
+            with pytest.raises(TransportError, match="native transport is not available"):
+                server.send(msg)
 
-    def test_send_without_tp_uses_transport(self, server_config: ServerConfig) -> None:
+    def test_send_without_tp_raises_without_native(self, server_config: ServerConfig) -> None:
         with SomeIpServer(server_config) as server:
             msg = Message(
                 message_id=MessageId(0x1234, 0x0001),
                 payload=b"\x00",
             )
-            server.send(msg)
+            with pytest.raises(TransportError, match="native transport is not available"):
+                server.send(msg)
 
 
 class TestE2EIntegration:
@@ -228,16 +234,20 @@ class TestE2EIntegration:
 
         server.register_method(method, handler)
 
-    def test_publish_event_with_e2e(self, e2e_server_config: ServerConfig) -> None:
+    def test_publish_event_with_e2e_raises_without_native(
+        self, e2e_server_config: ServerConfig
+    ) -> None:
         with SomeIpServer(e2e_server_config) as server:
             server.register_event(event_id=0x8001, eventgroup_id=0x0001)
-            server.publish_event(event_id=0x8001, payload=b"\x01")
+            with pytest.raises(RuntimeError, match="C\\+\\+ extension is not available"):
+                server.publish_event(event_id=0x8001, payload=b"\x01")
 
 
 class TestSetField:
     """Server field event support (getter/setter pattern)."""
 
-    def test_set_field(self, server_config: ServerConfig) -> None:
+    def test_set_field_raises_without_native(self, server_config: ServerConfig) -> None:
         with SomeIpServer(server_config) as server:
             server.register_event(event_id=0x8001, eventgroup_id=0x0001)
-            server.set_field(event_id=0x8001, payload=b"\x42")
+            with pytest.raises(RuntimeError, match="C\\+\\+ extension is not available"):
+                server.set_field(event_id=0x8001, payload=b"\x42")

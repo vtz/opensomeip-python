@@ -40,6 +40,17 @@ cd opensomeip-python
 pip install -e ".[dev]"
 ```
 
+### Verify native extension
+
+After installing, confirm the C++ extension loaded successfully:
+
+```bash
+python3 -c "from opensomeip._bridge import get_ext; ext = get_ext(); print('native:', ext is not None)"
+```
+
+If this prints `native: False`, the library will raise errors on any network
+operation. See the [Troubleshooting](#troubleshooting) section below.
+
 ## Quick Start
 
 ### Server — offer a service and handle RPC calls
@@ -208,20 +219,21 @@ Windows) are compiled in CI with the correct toolchain and don't have this issue
 If a wheel exists for your platform you'll never hit this problem — it only
 occurs when pip falls back to building from the source distribution.
 
-### Silent no-op transport (no socket opened)
+### Operations fail with "C++ extension is not available"
 
-If the C++ extension fails to load, the library warns via Python's
-`warnings` module and falls back to stub transport classes. These stubs
-set `is_running = True` but **do not open any network sockets**. If your
-server appears to start but `lsof` shows no listening socket, check for the
-`ImportWarning` that opensomeip emits at import time:
+If the C++ extension fails to load, all operations that require the native
+stack (RPC calls, transport send, event subscriptions) will raise clear errors
+such as `RpcError`, `TransportError`, or `RuntimeError` with a message
+indicating the C++ extension is not available.
+
+To check whether the extension loaded:
 
 ```bash
-python -W all your_script.py
+python3 -c "from opensomeip._bridge import get_ext; ext = get_ext(); print('native:', ext is not None)"
 ```
 
-If you see the warning, follow the steps in the section above to fix the
-extension build.
+If this prints `native: False`, follow the steps in the section above to fix
+the extension build.
 
 ## Development
 

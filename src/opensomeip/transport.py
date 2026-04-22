@@ -146,14 +146,21 @@ class Transport:
         """Send a SOME/IP message, delegating to C++ when available."""
         if not self._running:
             raise TransportError("Transport is not running")
-        if self._cpp is not None:
-            cpp_msg = to_cpp_message(message)
-            target = endpoint or self._remote
-            if target is None and hasattr(message, "source_endpoint"):
-                target = message.source_endpoint
-            if target is not None:
-                cpp_ep = to_cpp_endpoint(target)
-                self._cpp.send_message(cpp_msg, cpp_ep)
+        if self._cpp is None:
+            raise TransportError(
+                "Cannot send: opensomeip native transport is not available. "
+                "See https://github.com/vtz/opensomeip-python#troubleshooting"
+            )
+        cpp_msg = to_cpp_message(message)
+        target = endpoint or self._remote
+        if target is None and hasattr(message, "source_endpoint"):
+            target = message.source_endpoint
+        if target is None:
+            raise TransportError(
+                "No target endpoint specified and no remote endpoint configured"
+            )
+        cpp_ep = to_cpp_endpoint(target)
+        self._cpp.send_message(cpp_msg, cpp_ep)
 
     def __enter__(self) -> Self:
         self.start()

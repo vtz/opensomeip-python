@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 
 from opensomeip.message import Message
@@ -51,7 +53,8 @@ class TestTpManager:
             message_id=MessageId(0x1234, 0x0001),
             payload=b"\x01" * 100,
         )
-        tp.send(msg)
+        with patch.object(transport, "send"):
+            tp.send(msg)
         tp.stop()
 
     def test_send_large_message_segments(self, transport: UdpTransport) -> None:
@@ -61,7 +64,8 @@ class TestTpManager:
             message_id=MessageId(0x1234, 0x0001),
             payload=b"\xaa" * 350,
         )
-        tp.send(msg)
+        with patch.object(transport, "send"):
+            tp.send(msg)
         tp.stop()
 
     def test_reassembled_returns_receiver(self, transport: UdpTransport) -> None:

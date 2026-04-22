@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 
 from opensomeip.exceptions import TransportError
@@ -57,11 +59,14 @@ class TestUdpTransport:
         with pytest.raises(TransportError, match="not running"):
             t.send(Message())
 
-    def test_send_when_running(self) -> None:
-        t = UdpTransport(Endpoint("0.0.0.0", 0))
-        t.start()
-        t.send(Message())  # should not raise
-        t.stop()
+    def test_send_raises_without_native(self) -> None:
+        """send() raises TransportError when the C++ extension is unavailable."""
+        with patch("opensomeip.transport.get_ext", return_value=None):
+            t = UdpTransport(Endpoint("0.0.0.0", 0))
+            t.start()
+            with pytest.raises(TransportError, match="native transport is not available"):
+                t.send(Message())
+            t.stop()
 
     def test_multicast_group(self) -> None:
         t = UdpTransport(Endpoint("0.0.0.0", 0), multicast_group="239.1.1.1")
