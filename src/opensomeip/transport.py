@@ -156,9 +156,7 @@ class Transport:
         if target is None and hasattr(message, "source_endpoint"):
             target = message.source_endpoint
         if target is None:
-            raise TransportError(
-                "No target endpoint specified and no remote endpoint configured"
-            )
+            raise TransportError("No target endpoint specified and no remote endpoint configured")
         cpp_ep = to_cpp_endpoint(target)
         self._cpp.send_message(cpp_msg, cpp_ep)
 
