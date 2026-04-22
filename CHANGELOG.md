@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- towncrier release notes start -->
 
+## [0.1.5](https://github.com/vtz/opensomeip-python/releases/tag/v0.1.5) - 2026-04-22
+
+### Bug Fixes
+
+- Operations that require the native C++ extension (RPC calls, transport send,
+  event subscriptions) now raise clear errors (`RpcError`, `TransportError`,
+  `RuntimeError`) instead of silently returning empty/fake responses or dropping
+  messages when the extension is unavailable. (Fixes #17)
+
+### Documentation
+
+- Add "Verify native extension" subsection to the README after Installation.
+- Update the Troubleshooting section to describe the new error-raising behavior.
+
+### Miscellaneous
+
+- Update opensomeip C++ submodule to latest main (`85b4c91`).
+
 ## [0.1.4](https://github.com/vtz/opensomeip-python/releases/tag/v0.1.4) - 2026-04-18
 
 ### Features
