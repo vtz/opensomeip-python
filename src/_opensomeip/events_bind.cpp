@@ -110,6 +110,8 @@ void init_events(py::module_& m) {
         .def("publish_field", &EventPublisher::publish_field,
              py::arg("event_id"), py::arg("data"),
              py::call_guard<py::gil_scoped_release>())
+        .def("set_default_client_endpoint", &EventPublisher::set_default_client_endpoint,
+             py::arg("address"), py::arg("port"))
         .def("handle_subscription", &EventPublisher::handle_subscription,
              py::arg("eventgroup_id"), py::arg("client_id"),
              py::arg("filters") = std::vector<EventFilter>{})
@@ -133,6 +135,10 @@ void init_events(py::module_& m) {
         .def(py::init<uint16_t>(), py::arg("client_id"))
         .def("initialize", &EventSubscriber::initialize)
         .def("shutdown", &EventSubscriber::shutdown, py::call_guard<py::gil_scoped_release>())
+        .def("set_default_endpoint", &EventSubscriber::set_default_endpoint,
+             py::arg("address"), py::arg("port"))
+        .def("set_endpoint_resolver", &EventSubscriber::set_endpoint_resolver,
+             py::arg("resolver"))
         .def("subscribe_eventgroup", &EventSubscriber::subscribe_eventgroup,
              py::arg("service_id"), py::arg("instance_id"), py::arg("eventgroup_id"),
              py::arg("notification_callback"),
