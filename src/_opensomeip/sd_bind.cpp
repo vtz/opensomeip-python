@@ -44,7 +44,7 @@ void init_sd(py::module_& m) {
         .value("REJECTED", SubscriptionState::REJECTED);
 
     py::class_<ServiceInstance>(sd, "ServiceInstance")
-        .def(py::init<uint16_t, uint16_t, uint8_t, uint8_t>(),
+        .def(py::init<uint16_t, uint16_t, uint8_t, uint32_t>(),
              py::arg("service_id") = 0, py::arg("instance_id") = 0,
              py::arg("major_version") = 0, py::arg("minor_version") = 0)
         .def_readwrite("service_id", &ServiceInstance::service_id)
@@ -86,6 +86,7 @@ void init_sd(py::module_& m) {
         .def_readwrite("service_id", &EventGroupSubscription::service_id)
         .def_readwrite("instance_id", &EventGroupSubscription::instance_id)
         .def_readwrite("eventgroup_id", &EventGroupSubscription::eventgroup_id)
+        .def_readwrite("major_version", &EventGroupSubscription::major_version)
         .def_readwrite("state", &EventGroupSubscription::state);
 
     py::class_<SdClient> sd_client(sd, "SdClient");
@@ -135,6 +136,7 @@ void init_sd(py::module_& m) {
         .def("offer_service", &SdServer::offer_service,
              py::arg("instance"), py::arg("unicast_endpoint"),
              py::arg("multicast_endpoint") = "",
+             py::arg("eventgroup_ids") = std::vector<uint16_t>{},
              py::call_guard<py::gil_scoped_release>())
         .def("stop_offer_service", &SdServer::stop_offer_service,
              py::arg("service_id"), py::arg("instance_id"),

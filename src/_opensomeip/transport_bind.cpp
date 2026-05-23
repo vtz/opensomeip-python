@@ -114,7 +114,9 @@ void init_transport(py::module_& m) {
         .def_readwrite("max_receive_buffer", &TcpTransportConfig::max_receive_buffer)
         .def_readwrite("max_connections", &TcpTransportConfig::max_connections)
         .def_readwrite("keep_alive", &TcpTransportConfig::keep_alive)
-        .def_readwrite("keep_alive_interval", &TcpTransportConfig::keep_alive_interval);
+        .def_readwrite("keep_alive_interval", &TcpTransportConfig::keep_alive_interval)
+        .def_readwrite("magic_cookie_enabled", &TcpTransportConfig::magic_cookie_enabled)
+        .def_readwrite("magic_cookie_interval", &TcpTransportConfig::magic_cookie_interval);
 
     py::class_<TcpTransport>(m, "TcpTransport")
         .def(py::init<const TcpTransportConfig&>(),
@@ -141,5 +143,9 @@ void init_transport(py::module_& m) {
              py::arg("backlog") = 5,
              py::call_guard<py::gil_scoped_release>())
         .def("accept_connection", &TcpTransport::accept_connection,
-             py::call_guard<py::gil_scoped_release>());
+             py::call_guard<py::gil_scoped_release>())
+        .def_static("is_magic_cookie", &TcpTransport::is_magic_cookie,
+             py::arg("data"), py::arg("offset") = 0)
+        .def_static("make_magic_cookie_client", &TcpTransport::make_magic_cookie_client)
+        .def_static("make_magic_cookie_server", &TcpTransport::make_magic_cookie_server);
 }
