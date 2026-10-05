@@ -45,7 +45,10 @@ void init_e2e(py::module_& m) {
         .def_readwrite("profile_id", &E2EConfig::profile_id)
         .def_readwrite("profile_name", &E2EConfig::profile_name)
         .def_readwrite("data_id", &E2EConfig::data_id)
-        .def_readwrite("offset", &E2EConfig::offset)
+        .def_readwrite("offset_bits", &E2EConfig::offset_bits)
+        .def_property_readonly_static(
+            "DEFAULT_OFFSET_BITS",
+            [](py::object /*cls*/) { return E2EConfig::DEFAULT_OFFSET_BITS; })
         .def_readwrite("enable_crc", &E2EConfig::enable_crc)
         .def_readwrite("enable_counter", &E2EConfig::enable_counter)
         .def_readwrite("enable_freshness", &E2EConfig::enable_freshness)

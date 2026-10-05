@@ -204,14 +204,17 @@ class SdClient:
         if self._cpp is not None:
             receiver = self._find_receiver
 
-            def _on_found(cpp_svc: Any) -> None:
-                py_svc = from_cpp_service_instance(cpp_svc)
-                from opensomeip.message import Message
+            def _on_found(found: Any) -> None:
+                # Native find_service passes a sequence of ServiceInstance.
+                services = found if isinstance(found, (list, tuple)) else [found]
+                for cpp_svc in services:
+                    py_svc = from_cpp_service_instance(cpp_svc)
+                    from opensomeip.message import Message
 
-                msg = Message(payload=repr(py_svc).encode())
-                receiver.put(msg)
-                if callback is not None:
-                    callback(py_svc)
+                    msg = Message(payload=repr(py_svc).encode())
+                    receiver.put(msg)
+                    if callback is not None:
+                        callback(py_svc)
 
             try:
                 self._cpp.find_service(service.service_id, _on_found)

@@ -118,6 +118,9 @@ void init_sd(py::module_& m) {
              py::arg("service_id"), py::arg("instance_id"), py::arg("eventgroup_id"))
         .def("get_available_services", &SdClient::get_available_services,
              py::arg("service_id") = 0)
+        .def("get_eventgroup_subscription_state",
+             &SdClient::get_eventgroup_subscription_state,
+             py::arg("service_id"), py::arg("instance_id"), py::arg("eventgroup_id"))
         .def("is_ready", &SdClient::is_ready)
         .def("get_statistics", &SdClient::get_statistics);
 

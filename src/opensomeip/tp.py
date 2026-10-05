@@ -129,11 +129,30 @@ class TpManager:
         """Return a :class:`MessageReceiver` yielding fully reassembled messages."""
         return self._reassembly_receiver
 
-    def get_statistics(self) -> Any:
-        """Return TP statistics (native only)."""
+    def get_sender_statistics(self) -> Any:
+        """Return sender-path TP statistics (native only)."""
         if self._cpp is not None:
-            return self._cpp.get_statistics()
+            return self._cpp.get_sender_statistics()
         return None
+
+    def get_receiver_statistics(self) -> Any:
+        """Return receiver-path TP statistics (native only)."""
+        if self._cpp is not None:
+            return self._cpp.get_receiver_statistics()
+        return None
+
+    def get_statistics(self) -> Any:
+        """Return TP statistics (native only).
+
+        opensomeip v0.2.0 reports sender and receiver counters separately.
+        This helper returns both snapshots.
+        """
+        if self._cpp is None:
+            return None
+        return {
+            "sender": self.get_sender_statistics(),
+            "receiver": self.get_receiver_statistics(),
+        }
 
     def __enter__(self) -> Self:
         self.start()

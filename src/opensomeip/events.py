@@ -163,6 +163,11 @@ class EventSubscriber:
         ext = get_ext()
         if ext is not None:
             self._cpp = ext.events.EventSubscriber(client_id)
+            # v0.2.0 no longer falls back to 127.0.0.1:30490 when the
+            # service endpoint was not resolved.
+            if transport.remote_endpoint is not None:
+                remote = transport.remote_endpoint
+                self._cpp.set_default_endpoint(remote.ip, remote.port)
 
     @property
     def is_running(self) -> bool:

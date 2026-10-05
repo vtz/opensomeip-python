@@ -20,7 +20,12 @@ void init_rpc(py::module_& m) {
         .value("INVALID_PARAMETERS", RpcResult::INVALID_PARAMETERS)
         .value("METHOD_NOT_FOUND", RpcResult::METHOD_NOT_FOUND)
         .value("SERVICE_NOT_AVAILABLE", RpcResult::SERVICE_NOT_AVAILABLE)
+        .value("WRONG_INTERFACE_VERSION", RpcResult::WRONG_INTERFACE_VERSION)
         .value("INTERNAL_ERROR", RpcResult::INTERNAL_ERROR);
+
+    py::enum_<MethodSemantics>(rpc, "MethodSemantics")
+        .value("REQUEST_RESPONSE", MethodSemantics::REQUEST_RESPONSE)
+        .value("FIRE_AND_FORGET", MethodSemantics::FIRE_AND_FORGET);
 
     py::class_<RpcTimeout>(rpc, "RpcTimeout")
         .def(py::init<>())
@@ -65,17 +70,51 @@ void init_rpc(py::module_& m) {
         .def_readonly("timeout_calls", &RpcClient::Statistics::timeout_calls)
         .def_readonly("average_response_time", &RpcClient::Statistics::average_response_time);
     rpc_client
-        .def(py::init<uint16_t>(), py::arg("client_id"))
+        .def(py::init<uint16_t, uint8_t, const someip::transport::Endpoint&>(),
+             py::arg("client_id"),
+             py::arg("interface_version") = static_cast<uint8_t>(0x01),
+             py::arg("local_bind") = someip::transport::Endpoint("0.0.0.0", 0))
         .def("initialize", &RpcClient::initialize)
         .def("shutdown", &RpcClient::shutdown, py::call_guard<py::gil_scoped_release>())
-        .def("call_method_sync", &RpcClient::call_method_sync,
+        .def("set_remote_endpoint", &RpcClient::set_remote_endpoint, py::arg("endpoint"))
+        .def("get_local_endpoint", &RpcClient::get_local_endpoint)
+        .def("call_method_sync",
+             static_cast<RpcSyncResult (RpcClient::*)(
+                 uint16_t, MethodId, const someip::platform::ByteBuffer&, const RpcTimeout&)>(
+                 &RpcClient::call_method_sync),
              py::arg("service_id"), py::arg("method_id"),
              py::arg("parameters"), py::arg("timeout") = RpcTimeout(),
              py::call_guard<py::gil_scoped_release>())
-        .def("call_method_async", &RpcClient::call_method_async,
+        .def("call_method_sync",
+             static_cast<RpcSyncResult (RpcClient::*)(
+                 uint16_t, MethodId, const someip::platform::ByteBuffer&,
+                 const someip::transport::Endpoint&, const RpcTimeout&)>(
+                 &RpcClient::call_method_sync),
+             py::arg("service_id"), py::arg("method_id"),
+             py::arg("parameters"), py::arg("server_endpoint"),
+             py::arg("timeout") = RpcTimeout(),
+             py::call_guard<py::gil_scoped_release>())
+        .def("call_method_async",
+             static_cast<RpcCallHandle (RpcClient::*)(
+                 uint16_t, MethodId, const someip::platform::ByteBuffer&, RpcCallback,
+                 const RpcTimeout&)>(
+                 &RpcClient::call_method_async),
              py::arg("service_id"), py::arg("method_id"),
              py::arg("parameters"), py::arg("callback"),
              py::arg("timeout") = RpcTimeout(),
+             py::call_guard<py::gil_scoped_release>())
+        .def("call_method_async",
+             static_cast<RpcCallHandle (RpcClient::*)(
+                 uint16_t, MethodId, const someip::platform::ByteBuffer&, RpcCallback,
+                 const someip::transport::Endpoint&, const RpcTimeout&)>(
+                 &RpcClient::call_method_async),
+             py::arg("service_id"), py::arg("method_id"),
+             py::arg("parameters"), py::arg("callback"),
+             py::arg("server_endpoint"), py::arg("timeout") = RpcTimeout(),
+             py::call_guard<py::gil_scoped_release>())
+        .def("send_request_no_return", &RpcClient::send_request_no_return,
+             py::arg("service_id"), py::arg("method_id"),
+             py::arg("parameters"), py::arg("dest"),
              py::call_guard<py::gil_scoped_release>())
         .def("cancel_call", &RpcClient::cancel_call, py::arg("handle"))
         .def("is_ready", &RpcClient::is_ready)
@@ -90,11 +129,17 @@ void init_rpc(py::module_& m) {
         .def_readonly("method_not_found_errors", &RpcServer::Statistics::method_not_found_errors)
         .def_readonly("average_processing_time", &RpcServer::Statistics::average_processing_time);
     rpc_server
-        .def(py::init<uint16_t>(), py::arg("service_id"))
+        .def(py::init<uint16_t, uint8_t, const someip::transport::Endpoint&>(),
+             py::arg("service_id"),
+             py::arg("interface_version") = static_cast<uint8_t>(0x01),
+             py::arg("bind_endpoint") = someip::transport::Endpoint(
+                 "127.0.0.1", SOMEIP_DEFAULT_RPC_PORT))
         .def("initialize", &RpcServer::initialize)
         .def("shutdown", &RpcServer::shutdown, py::call_guard<py::gil_scoped_release>())
         .def("register_method", &RpcServer::register_method,
-             py::arg("method_id"), py::arg("handler"))
+             py::arg("method_id"), py::arg("handler"),
+             py::arg("semantics") = MethodSemantics::REQUEST_RESPONSE)
+        .def("get_local_endpoint", &RpcServer::get_local_endpoint)
         .def("unregister_method", &RpcServer::unregister_method, py::arg("method_id"))
         .def("is_method_registered", &RpcServer::is_method_registered, py::arg("method_id"))
         .def("get_registered_methods", &RpcServer::get_registered_methods)
