@@ -14,9 +14,15 @@ void init_tp(py::module_& m);
 void init_e2e(py::module_& m);
 void init_exceptions(py::module_& m);
 
+/**
+ * @brief Initialize the native opensomeip Python extension.
+ *
+ * Registers the exception, type, message, serialization, transport, service
+ * discovery, RPC, event, transport-protocol, and E2E bindings.
+ */
 PYBIND11_MODULE(_opensomeip, m) {
     m.doc() = "Python bindings for the opensomeip C++ SOME/IP stack";
-    m.attr("__version__") = "0.1.1";
+    m.attr("__version__") = "0.2.0";
 
     init_exceptions(m);
     init_types(m);
