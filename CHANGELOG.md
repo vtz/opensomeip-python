@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- towncrier release notes start -->
 
+## [0.2.0](https://github.com/vtz/opensomeip-python/releases/tag/v0.2.0) - 2026-10-06
+
+### Features
+
+- Update opensomeip C++ submodule to **v0.2.0** and adapt the pybind11 bindings:
+  - E2E: `E2EConfig.offset` is now `offset_bits`, and `DEFAULT_OFFSET_BITS` is exposed.
+  - Message: `try_deserialize` returns the native `Result`.
+  - SD: `SdClient.get_eventgroup_subscription_state`.
+  - Transport: message-rejection callback, UDP `enable_tp` and `last_multicast_error`,
+    `receive_message_with_sender`, and TCP connection helpers
+    (`connection_count`, `max_connections`, `is_peer_connected`, `disconnect_peer`).
+  - RPC: `MethodSemantics`, `RpcResult.WRONG_INTERFACE_VERSION`, interface version and
+    bind endpoint on `RpcClient` / `RpcServer`, `set_remote_endpoint`,
+    `get_local_endpoint`, and `send_request_no_return`.
+  - Events: `EventPublisher.handle_subscription` accepts an optional TTL.
+  - TP: sender and receiver statistics, `TpReassemblyKey`, and the additional
+    segment-header fields from v0.2.0.
+  (#28)
+
+### Breaking Changes
+
+- `E2EConfig.offset` was renamed to `offset_bits`.
+- `TcpTransport.accept_connection` is no longer bound; use the connection helpers above.
+- Native RPC no longer sends application traffic to `127.0.0.1:30490` when no remote
+  is configured. `RpcClient` applies `Transport.remote_endpoint` when one is set.
+- `TpManager.get_statistics()` returns `{"sender", "receiver"}` when the native
+  extension is loaded. Use `get_sender_statistics()` and `get_receiver_statistics()`
+  for one side.
+
 ## [0.1.5](https://github.com/vtz/opensomeip-python/releases/tag/v0.1.5) - 2026-05-24
 
 ### Features
