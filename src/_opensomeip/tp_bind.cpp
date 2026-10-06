@@ -58,13 +58,32 @@ void init_tp(py::module_& m) {
         .def_readwrite("segment_offset", &TpSegmentHeader::segment_offset)
         .def_readwrite("segment_length", &TpSegmentHeader::segment_length)
         .def_readwrite("sequence_number", &TpSegmentHeader::sequence_number)
-        .def_readwrite("message_type", &TpSegmentHeader::message_type);
+        .def_readwrite("message_type", &TpSegmentHeader::message_type)
+        .def_readwrite("service_id", &TpSegmentHeader::service_id)
+        .def_readwrite("method_id", &TpSegmentHeader::method_id)
+        .def_readwrite("client_id", &TpSegmentHeader::client_id)
+        .def_readwrite("session_id", &TpSegmentHeader::session_id)
+        .def_readwrite("protocol_version", &TpSegmentHeader::protocol_version)
+        .def_readwrite("interface_version", &TpSegmentHeader::interface_version);
 
     py::class_<TpSegment>(tp, "TpSegment")
         .def(py::init<>())
         .def_readwrite("header", &TpSegment::header)
         .def_readwrite("payload", &TpSegment::payload)
-        .def_readwrite("retransmit_count", &TpSegment::retransmit_count);
+        .def_readwrite("retransmit_count", &TpSegment::retransmit_count)
+        .def_readwrite("sender_ipv4", &TpSegment::sender_ipv4)
+        .def_readwrite("sender_port", &TpSegment::sender_port);
+
+    py::class_<TpReassemblyKey>(tp, "TpReassemblyKey")
+        .def(py::init<>())
+        .def_readwrite("message_id", &TpReassemblyKey::message_id)
+        .def_readwrite("protocol_version", &TpReassemblyKey::protocol_version)
+        .def_readwrite("interface_version", &TpReassemblyKey::interface_version)
+        .def_readwrite("message_type", &TpReassemblyKey::message_type)
+        .def_readwrite("request_id", &TpReassemblyKey::request_id)
+        .def_readwrite("sender_ipv4", &TpReassemblyKey::sender_ipv4)
+        .def_readwrite("sender_port", &TpReassemblyKey::sender_port)
+        .def("__eq__", &TpReassemblyKey::operator==);
 
     py::class_<TpStatistics>(tp, "TpStatistics")
         .def(py::init<>())
@@ -84,10 +103,27 @@ void init_tp(py::module_& m) {
 
     py::class_<TpReassembler>(tp, "TpReassembler")
         .def(py::init<const TpConfig&>(), py::arg("config") = TpConfig())
-        .def("process_segment", &TpReassembler::process_segment,
+        .def("process_segment",
+             [](TpReassembler& reassembler, const TpSegment& segment,
+                someip::platform::ByteBuffer& complete_message) {
+                 return reassembler.process_segment(segment, complete_message, nullptr);
+             },
              py::arg("segment"), py::arg("complete_message"))
-        .def("is_reassembling", &TpReassembler::is_reassembling, py::arg("message_id"))
-        .def("cancel_reassembly", &TpReassembler::cancel_reassembly, py::arg("message_id"))
+        .def("is_reassembling",
+             static_cast<bool (TpReassembler::*)(uint32_t) const>(
+                 &TpReassembler::is_reassembling),
+             py::arg("message_id"))
+        .def("is_reassembling",
+             static_cast<bool (TpReassembler::*)(const TpReassemblyKey&) const>(
+                 &TpReassembler::is_reassembling),
+             py::arg("key"))
+        .def("cancel_reassembly",
+             static_cast<void (TpReassembler::*)(uint32_t)>(&TpReassembler::cancel_reassembly),
+             py::arg("message_id"))
+        .def("cancel_reassembly",
+             static_cast<void (TpReassembler::*)(const TpReassemblyKey&)>(
+                 &TpReassembler::cancel_reassembly),
+             py::arg("key"))
         .def("process_timeouts", &TpReassembler::process_timeouts)
         .def("get_active_reassemblies", &TpReassembler::get_active_reassemblies)
         .def("update_config", &TpReassembler::update_config, py::arg("config"));
@@ -118,6 +154,7 @@ void init_tp(py::module_& m) {
         .def("set_progress_callback", &TpManager::set_progress_callback, py::arg("callback"))
         .def("set_message_callback", &TpManager::set_message_callback, py::arg("callback"))
         .def("process_timeouts", &TpManager::process_timeouts)
-        .def("get_statistics", &TpManager::get_statistics)
+        .def("get_sender_statistics", &TpManager::get_sender_statistics)
+        .def("get_receiver_statistics", &TpManager::get_receiver_statistics)
         .def("update_config", &TpManager::update_config, py::arg("config"));
 }

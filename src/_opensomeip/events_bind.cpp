@@ -112,8 +112,18 @@ void init_events(py::module_& m) {
              py::call_guard<py::gil_scoped_release>())
         .def("set_default_client_endpoint", &EventPublisher::set_default_client_endpoint,
              py::arg("address"), py::arg("port"))
-        .def("handle_subscription", &EventPublisher::handle_subscription,
+        .def("handle_subscription",
+             static_cast<bool (EventPublisher::*)(
+                 uint16_t, uint16_t, const someip::platform::Vector<EventFilter>&)>(
+                 &EventPublisher::handle_subscription),
              py::arg("eventgroup_id"), py::arg("client_id"),
+             py::arg("filters") = std::vector<EventFilter>{})
+        .def("handle_subscription",
+             static_cast<bool (EventPublisher::*)(
+                 uint16_t, uint16_t, uint32_t, const someip::platform::Vector<EventFilter>&)>(
+                 &EventPublisher::handle_subscription),
+             py::arg("eventgroup_id"), py::arg("client_id"),
+             py::arg("ttl_seconds"),
              py::arg("filters") = std::vector<EventFilter>{})
         .def("handle_unsubscription", &EventPublisher::handle_unsubscription,
              py::arg("eventgroup_id"), py::arg("client_id"))

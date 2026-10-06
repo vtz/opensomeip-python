@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable
 if TYPE_CHECKING:
     from typing_extensions import Self
 
-from opensomeip._bridge import from_cpp_message, get_ext, to_cpp_message
+from opensomeip._bridge import from_cpp_message, get_ext, to_cpp_endpoint, to_cpp_message
 from opensomeip.exceptions import RpcError
 from opensomeip.message import Message
 from opensomeip.receiver import MessageReceiver
@@ -58,6 +58,9 @@ class RpcClient:
         ext = get_ext()
         if ext is not None:
             self._cpp = ext.rpc.RpcClient(client_id)
+            # v0.2.0 no longer defaults application traffic to 127.0.0.1:30490.
+            if transport.remote_endpoint is not None:
+                self._cpp.set_remote_endpoint(to_cpp_endpoint(transport.remote_endpoint))
 
     @property
     def is_running(self) -> bool:
@@ -221,7 +224,9 @@ class RpcServer:
         self._cpp: Any = None
         ext = get_ext()
         if ext is not None:
-            self._cpp = ext.rpc.RpcServer(service_id)
+            # v0.2.0 defaults this socket to 127.0.0.1:30501. Use an ephemeral
+            # port so it does not occupy an address the application chose.
+            self._cpp = ext.rpc.RpcServer(service_id, 0x01, ext.Endpoint("127.0.0.1", 0))
 
     @property
     def is_running(self) -> bool:

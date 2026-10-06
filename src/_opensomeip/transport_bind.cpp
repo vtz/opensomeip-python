@@ -3,6 +3,7 @@
 #include <pybind11/chrono.h>
 
 #include "transport/endpoint.h"
+#include "transport/message_rejection.h"
 #include "transport/transport.h"
 #include "transport/udp_transport.h"
 #include "transport/tcp_transport.h"
@@ -32,6 +33,11 @@ struct PyTransportListener : ITransportListener {
     void on_error(Result error) override {
         py::gil_scoped_acquire gil;
         PYBIND11_OVERRIDE_PURE(void, ITransportListener, on_error, error);
+    }
+
+    void on_message_rejected(const MessageRejectionInfo& info) override {
+        py::gil_scoped_acquire gil;
+        PYBIND11_OVERRIDE(void, ITransportListener, on_message_rejected, info);
     }
 };
 
@@ -65,12 +71,31 @@ void init_transport(py::module_& m) {
         .value("CONNECTED", TcpConnectionState::CONNECTED)
         .value("DISCONNECTING", TcpConnectionState::DISCONNECTING);
 
+    py::enum_<MessageRejectionStage>(m, "MessageRejectionStage")
+        .value("DESERIALIZE", MessageRejectionStage::DESERIALIZE)
+        .value("TCP_FRAMING", MessageRejectionStage::TCP_FRAMING)
+        .value("TP_REASSEMBLY", MessageRejectionStage::TP_REASSEMBLY)
+        .value("E2E_INTEGRITY", MessageRejectionStage::E2E_INTEGRITY);
+
+    py::class_<MessageRejectionInfo>(m, "MessageRejectionInfo")
+        .def(py::init<>())
+        .def_readwrite("sender", &MessageRejectionInfo::sender)
+        .def_readwrite("result", &MessageRejectionInfo::result)
+        .def_readwrite("stage", &MessageRejectionInfo::stage)
+        .def_readwrite("has_message_id", &MessageRejectionInfo::has_message_id)
+        .def_readwrite("message_id", &MessageRejectionInfo::message_id)
+        .def_readwrite("has_request_id", &MessageRejectionInfo::has_request_id)
+        .def_readwrite("request_id", &MessageRejectionInfo::request_id);
+
     py::class_<ITransportListener, PyTransportListener>(m, "ITransportListener")
         .def(py::init<>())
-        .def("on_message_received", &ITransportListener::on_message_received)
+        .def("on_message_received",
+             static_cast<void (ITransportListener::*)(MessagePtr, const Endpoint&)>(
+                 &ITransportListener::on_message_received))
         .def("on_connection_lost", &ITransportListener::on_connection_lost)
         .def("on_connection_established", &ITransportListener::on_connection_established)
-        .def("on_error", &ITransportListener::on_error);
+        .def("on_error", &ITransportListener::on_error)
+        .def("on_message_rejected", &ITransportListener::on_message_rejected);
 
     py::class_<UdpTransportConfig>(m, "UdpTransportConfig")
         .def(py::init<>())
@@ -82,7 +107,14 @@ void init_transport(py::module_& m) {
         .def_readwrite("enable_broadcast", &UdpTransportConfig::enable_broadcast)
         .def_readwrite("multicast_interface", &UdpTransportConfig::multicast_interface)
         .def_readwrite("multicast_ttl", &UdpTransportConfig::multicast_ttl)
-        .def_readwrite("max_message_size", &UdpTransportConfig::max_message_size);
+        .def_readwrite("max_message_size", &UdpTransportConfig::max_message_size)
+        .def_readwrite("enable_tp", &UdpTransportConfig::enable_tp);
+
+    py::class_<MulticastError>(m, "MulticastError")
+        .def(py::init<>())
+        .def_readwrite("group_address", &MulticastError::group_address)
+        .def_readwrite("interface_address", &MulticastError::interface_address)
+        .def_readwrite("system_error", &MulticastError::system_error);
 
     py::class_<UdpTransport>(m, "UdpTransport")
         .def(py::init<const Endpoint&, const UdpTransportConfig&>(),
@@ -94,6 +126,11 @@ void init_transport(py::module_& m) {
              py::arg("message"), py::arg("endpoint"),
              py::call_guard<py::gil_scoped_release>())
         .def("receive_message", &UdpTransport::receive_message)
+        .def("receive_message_with_sender", [](UdpTransport& transport) {
+            Endpoint sender;
+            MessagePtr message = transport.receive_message_with_sender(sender);
+            return py::make_tuple(std::move(message), sender);
+        })
         .def("is_running", &UdpTransport::is_running)
         .def("is_connected", &UdpTransport::is_connected)
         .def("get_local_endpoint", &UdpTransport::get_local_endpoint)
@@ -104,7 +141,8 @@ void init_transport(py::module_& m) {
              py::call_guard<py::gil_scoped_release>())
         .def("leave_multicast_group", &UdpTransport::leave_multicast_group,
              py::arg("multicast_address"),
-             py::call_guard<py::gil_scoped_release>());
+             py::call_guard<py::gil_scoped_release>())
+        .def("last_multicast_error", &UdpTransport::last_multicast_error);
 
     py::class_<TcpTransportConfig>(m, "TcpTransportConfig")
         .def(py::init<>())
@@ -133,6 +171,11 @@ void init_transport(py::module_& m) {
              py::arg("message"), py::arg("endpoint"),
              py::call_guard<py::gil_scoped_release>())
         .def("receive_message", &TcpTransport::receive_message)
+        .def("receive_message_with_sender", [](TcpTransport& transport) {
+            Endpoint sender;
+            MessagePtr message = transport.receive_message_with_sender(sender);
+            return py::make_tuple(std::move(message), sender);
+        })
         .def("is_running", &TcpTransport::is_running)
         .def("is_connected", &TcpTransport::is_connected)
         .def("get_local_endpoint", &TcpTransport::get_local_endpoint)
@@ -142,7 +185,10 @@ void init_transport(py::module_& m) {
         .def("enable_server_mode", &TcpTransport::enable_server_mode,
              py::arg("backlog") = 5,
              py::call_guard<py::gil_scoped_release>())
-        .def("accept_connection", &TcpTransport::accept_connection,
+        .def("connection_count", &TcpTransport::connection_count)
+        .def("max_connections", &TcpTransport::max_connections)
+        .def("is_peer_connected", &TcpTransport::is_peer_connected, py::arg("peer"))
+        .def("disconnect_peer", &TcpTransport::disconnect_peer, py::arg("peer"),
              py::call_guard<py::gil_scoped_release>())
         .def_static("is_magic_cookie", &TcpTransport::is_magic_cookie,
              py::arg("data"), py::arg("offset") = 0)

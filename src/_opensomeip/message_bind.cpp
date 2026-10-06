@@ -52,6 +52,11 @@ void init_message(py::module_& m) {
             std::vector<uint8_t> vec(sv.begin(), sv.end());
             return msg.deserialize(vec);
         }, py::arg("data"))
+        .def("try_deserialize", [](Message& msg, py::bytes data) {
+            auto sv = static_cast<std::string_view>(data);
+            std::vector<uint8_t> vec(sv.begin(), sv.end());
+            return msg.try_deserialize(vec);
+        }, py::arg("data"))
 
         // Validation
         .def("is_valid", &Message::is_valid)

@@ -50,6 +50,7 @@ void init_types(py::module_& m) {
         .value("CONNECTION_REFUSED", Result::CONNECTION_REFUSED)
         .value("TIMEOUT", Result::TIMEOUT)
         .value("INVALID_ENDPOINT", Result::INVALID_ENDPOINT)
+        .value("MULTICAST_ERROR", Result::MULTICAST_ERROR)
         .value("INVALID_MESSAGE", Result::INVALID_MESSAGE)
         .value("INVALID_MESSAGE_TYPE", Result::INVALID_MESSAGE_TYPE)
         .value("INVALID_SERVICE_ID", Result::INVALID_SERVICE_ID)

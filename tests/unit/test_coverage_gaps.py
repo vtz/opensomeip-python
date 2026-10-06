@@ -272,6 +272,7 @@ class TestTpCoverage:
 
         manager = TpManager(t)
         with patch.object(manager, "_cpp", None):
-            result = manager.get_statistics()
-            assert result is None
+            assert manager.get_statistics() is None
+            assert manager.get_sender_statistics() is None
+            assert manager.get_receiver_statistics() is None
         t.stop()
