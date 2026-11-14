@@ -108,7 +108,9 @@ void init_transport(py::module_& m) {
         .def_readwrite("multicast_interface", &UdpTransportConfig::multicast_interface)
         .def_readwrite("multicast_ttl", &UdpTransportConfig::multicast_ttl)
         .def_readwrite("max_message_size", &UdpTransportConfig::max_message_size)
-        .def_readwrite("enable_tp", &UdpTransportConfig::enable_tp);
+        .def_readwrite("enable_tp", &UdpTransportConfig::enable_tp)
+        .def_readwrite("injected_multicast_join_errno",
+                       &UdpTransportConfig::injected_multicast_join_errno);
 
     py::class_<MulticastError>(m, "MulticastError")
         .def(py::init<>())

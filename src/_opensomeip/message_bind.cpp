@@ -57,6 +57,11 @@ void init_message(py::module_& m) {
             std::vector<uint8_t> vec(sv.begin(), sv.end());
             return msg.try_deserialize(vec);
         }, py::arg("data"))
+        .def("try_deserialize", [](Message& msg, py::bytes data, const e2e::E2EParseOptions& options) {
+            auto sv = static_cast<std::string_view>(data);
+            std::vector<uint8_t> vec(sv.begin(), sv.end());
+            return msg.try_deserialize(vec, options);
+        }, py::arg("data"), py::arg("options"))
 
         // Validation
         .def("is_valid", &Message::is_valid)
@@ -85,6 +90,22 @@ void init_message(py::module_& m) {
         .def("get_e2e_header", &Message::get_e2e_header)
         .def("set_e2e_header", &Message::set_e2e_header, py::arg("header"))
         .def("clear_e2e_header", &Message::clear_e2e_header)
+        .def("e2e_offset_bits", &Message::e2e_offset_bits)
+        .def("e2e_header_size", &Message::e2e_header_size)
+        .def("e2e_unprotected_prefix_size", &Message::e2e_unprotected_prefix_size)
+        .def("e2e_header_bytes", [](const Message& msg) {
+            return py::bytes(reinterpret_cast<const char*>(msg.e2e_header_bytes()),
+                             msg.e2e_header_size());
+        })
+        .def("e2e_unprotected_prefix", [](const Message& msg) {
+            return py::bytes(reinterpret_cast<const char*>(msg.e2e_unprotected_prefix()),
+                             msg.e2e_unprotected_prefix_size());
+        })
+        .def("set_e2e_unprotected_prefix", [](Message& msg, uint32_t offset_bits, py::bytes data) {
+            auto sv = static_cast<std::string_view>(data);
+            return msg.set_e2e_unprotected_prefix(
+                offset_bits, reinterpret_cast<const uint8_t*>(sv.data()), sv.size());
+        }, py::arg("offset_bits"), py::arg("data"))
 
         .def("__repr__", &Message::to_string)
         .def("__eq__", [](const Message& a, const Message& b) {
@@ -98,6 +119,12 @@ void init_message(py::module_& m) {
         });
 
     // E2EHeader binding (needed for Message's E2E accessors)
+    py::class_<e2e::E2EParseOptions>(m, "E2EParseOptions")
+        .def(py::init<>())
+        .def_readwrite("present", &e2e::E2EParseOptions::present)
+        .def_readwrite("offset_bits", &e2e::E2EParseOptions::offset_bits)
+        .def_readwrite("header_size", &e2e::E2EParseOptions::header_size);
+
     py::class_<e2e::E2EHeader>(m, "E2EHeader")
         .def(py::init<>())
         .def(py::init<uint32_t, uint32_t, uint16_t, uint16_t>(),

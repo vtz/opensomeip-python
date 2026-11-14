@@ -78,6 +78,8 @@ void init_rpc(py::module_& m) {
         .def("shutdown", &RpcClient::shutdown, py::call_guard<py::gil_scoped_release>())
         .def("set_remote_endpoint", &RpcClient::set_remote_endpoint, py::arg("endpoint"))
         .def("get_local_endpoint", &RpcClient::get_local_endpoint)
+        .def("get_transport_result", &RpcClient::get_transport_result)
+        .def("session_count", &RpcClient::session_count)
         .def("call_method_sync",
              static_cast<RpcSyncResult (RpcClient::*)(
                  uint16_t, MethodId, const someip::platform::ByteBuffer&, const RpcTimeout&)>(
@@ -140,6 +142,7 @@ void init_rpc(py::module_& m) {
              py::arg("method_id"), py::arg("handler"),
              py::arg("semantics") = MethodSemantics::REQUEST_RESPONSE)
         .def("get_local_endpoint", &RpcServer::get_local_endpoint)
+        .def("get_transport_result", &RpcServer::get_transport_result)
         .def("unregister_method", &RpcServer::unregister_method, py::arg("method_id"))
         .def("is_method_registered", &RpcServer::is_method_registered, py::arg("method_id"))
         .def("get_registered_methods", &RpcServer::get_registered_methods)

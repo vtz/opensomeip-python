@@ -59,6 +59,7 @@ void init_e2e(py::module_& m) {
     // E2EHeader is bound in message_bind.cpp, but also accessible here
     // via the e2e submodule for convenience
     e2e.attr("E2EHeader") = m.attr("E2EHeader");
+    e2e.attr("E2EParseOptions") = m.attr("E2EParseOptions");
 
     py::class_<E2EProfile, PyE2EProfile>(e2e, "E2EProfile")
         .def(py::init<>())
