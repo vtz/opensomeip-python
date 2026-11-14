@@ -194,3 +194,116 @@ class TestRpcServer:
         async with RpcServer(transport) as server:
             assert server.is_running is True
         assert server.is_running is False
+
+    def test_service_ids_attach_demux_and_adapt_handler(self) -> None:
+        socket = UdpTransport(Endpoint("127.0.0.1", 0))
+        native_socket = MagicMock()
+        socket._cpp = native_socket
+        demux = MagicMock()
+        native = MagicMock()
+        native.initialize.return_value = True
+        ext = MagicMock()
+        ext.ServiceDemux.return_value = demux
+        ext.rpc.RpcServer.return_value = native
+        ext.rpc.RpcResult.SUCCESS = "ok"
+        ext.rpc.RpcResult.INTERNAL_ERROR = "err"
+
+        with (
+            patch("opensomeip.rpc.get_ext", return_value=ext),
+            patch("opensomeip.transport.get_ext", return_value=ext),
+        ):
+            server = RpcServer(socket, service_ids=[0x1234, 0x2222])
+            server.start()
+
+            def echo(req: Message) -> Message:
+                return Message(
+                    message_id=req.message_id,
+                    request_id=req.request_id,
+                    payload=req.payload,
+                )
+
+            def fail(req: Message) -> Message:
+                return Message(payload=b"", return_code=ReturnCode.E_NOT_OK)
+
+            server.register_handler(MessageId(0x1234, 0x0001), echo)
+            server.register_handler(MessageId(0x9999, 0x0002), fail)
+
+        ext.ServiceDemux.assert_called_once_with(native_socket)
+        assert ext.rpc.RpcServer.call_count == 2
+        native.initialize.assert_called()
+        echo_handler = native.register_method.call_args_list[0].args[1]
+        code, payload = echo_handler(0x0001, 7, b"\x01\x02")
+        assert code == "ok"
+        assert payload == b"\x01\x02"
+        fail_handler = native.register_method.call_args_list[1].args[1]
+        fail_code, fail_payload = fail_handler(1, 1, b"")
+        assert fail_code == "err"
+        assert fail_payload == b""
+        assert server.is_running is True
+        server.stop()
+        native.shutdown.assert_called()
+
+    def test_ephemeral_initialize_error_is_ignored(self, transport: UdpTransport) -> None:
+        ext = MagicMock()
+        ext.rpc.RpcServer.return_value.initialize.side_effect = OSError("bind")
+        with patch("opensomeip.rpc.get_ext", return_value=ext):
+            server = RpcServer(transport)
+            server.start()
+            assert server.is_running is True
+            server.stop()
+
+    def test_demux_initialize_error_propagates(self) -> None:
+        socket = UdpTransport(Endpoint("127.0.0.1", 0))
+        socket._cpp = MagicMock()
+        ext = MagicMock()
+        ext.ServiceDemux.return_value = MagicMock()
+        ext.rpc.RpcServer.return_value.initialize.side_effect = OSError("bind")
+        with (
+            patch("opensomeip.rpc.get_ext", return_value=ext),
+            patch("opensomeip.transport.get_ext", return_value=ext),
+        ):
+            server = RpcServer(socket, service_ids=[0x1234])
+            with pytest.raises(OSError, match="bind"):
+                server.start()
+
+    def test_demux_registration_failure_raises(self) -> None:
+        socket = UdpTransport(Endpoint("127.0.0.1", 0))
+        socket._cpp = MagicMock()
+        ext = MagicMock()
+        ext.ServiceDemux.return_value = MagicMock()
+        ext.rpc.RpcServer.return_value.initialize.return_value = False
+        with (
+            patch("opensomeip.rpc.get_ext", return_value=ext),
+            patch("opensomeip.transport.get_ext", return_value=ext),
+        ):
+            server = RpcServer(socket, service_ids=[0x1234])
+            with pytest.raises(RpcError, match="service demux"):
+                server.start()
+
+    def test_demux_shutdown_error_is_raised_after_receivers_close(self) -> None:
+        socket = UdpTransport(Endpoint("127.0.0.1", 0))
+        socket._cpp = MagicMock()
+        ext = MagicMock()
+        ext.ServiceDemux.return_value = MagicMock()
+        native = ext.rpc.RpcServer.return_value
+        native.initialize.return_value = True
+        native.shutdown.side_effect = OSError("closed")
+        with (
+            patch("opensomeip.rpc.get_ext", return_value=ext),
+            patch("opensomeip.transport.get_ext", return_value=ext),
+        ):
+            server = RpcServer(socket, service_ids=[0x1234])
+            receiver = server.incoming_requests(MessageId(0x1234, 0x0001))
+            server.start()
+            with pytest.raises(OSError, match="closed"):
+                server.stop()
+        assert receiver.closed is True
+
+    def test_service_ids_without_native_socket_stay_on_ephemeral_port(self) -> None:
+        socket = UdpTransport(Endpoint("127.0.0.1", 0))
+        ext = MagicMock()
+        with patch("opensomeip.rpc.get_ext", return_value=ext):
+            RpcServer(socket, service_ids=[0x1234])
+        ext.ServiceDemux.assert_not_called()
+        ext.rpc.RpcServer.assert_called_once()
+        assert ext.rpc.RpcServer.call_args.args[0] == 0x1234

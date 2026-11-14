@@ -4,6 +4,7 @@
 
 #include "transport/endpoint.h"
 #include "transport/message_rejection.h"
+#include "transport/service_demux.h"
 #include "transport/transport.h"
 #include "transport/udp_transport.h"
 #include "transport/tcp_transport.h"
@@ -118,7 +119,9 @@ void init_transport(py::module_& m) {
         .def_readwrite("interface_address", &MulticastError::interface_address)
         .def_readwrite("system_error", &MulticastError::system_error);
 
-    py::class_<UdpTransport>(m, "UdpTransport")
+    py::class_<ITransport>(m, "ITransport");
+
+    py::class_<UdpTransport, ITransport>(m, "UdpTransport")
         .def(py::init<const Endpoint&, const UdpTransportConfig&>(),
              py::arg("local_endpoint"),
              py::arg("config") = UdpTransportConfig())
@@ -158,7 +161,7 @@ void init_transport(py::module_& m) {
         .def_readwrite("magic_cookie_enabled", &TcpTransportConfig::magic_cookie_enabled)
         .def_readwrite("magic_cookie_interval", &TcpTransportConfig::magic_cookie_interval);
 
-    py::class_<TcpTransport>(m, "TcpTransport")
+    py::class_<TcpTransport, ITransport>(m, "TcpTransport")
         .def(py::init<const TcpTransportConfig&>(),
              py::arg("config") = TcpTransportConfig())
         .def("initialize", &TcpTransport::initialize, py::arg("local_endpoint"),
@@ -196,4 +199,16 @@ void init_transport(py::module_& m) {
              py::arg("data"), py::arg("offset") = 0)
         .def_static("make_magic_cookie_client", &TcpTransport::make_magic_cookie_client)
         .def_static("make_magic_cookie_server", &TcpTransport::make_magic_cookie_server);
+
+    // The demux borrows a stopped transport and is its only listener.
+    // keep_alive ties the socket to the demux; index 1 is the demux.
+    py::class_<ServiceDemux, ITransportListener>(m, "ServiceDemux")
+        .def(py::init<ITransport&>(), py::arg("transport"), py::keep_alive<1, 2>())
+        .def("register_service", &ServiceDemux::register_service,
+             py::arg("service_id"), py::arg("handler"), py::keep_alive<1, 3>())
+        .def("unregister_service", &ServiceDemux::unregister_service, py::arg("service_id"))
+        .def("contains", &ServiceDemux::contains, py::arg("service_id"))
+        .def("start", &ServiceDemux::start, py::call_guard<py::gil_scoped_release>())
+        .def("stop", &ServiceDemux::stop, py::call_guard<py::gil_scoped_release>())
+        .def("transport", &ServiceDemux::transport, py::return_value_policy::reference);
 }

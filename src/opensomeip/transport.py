@@ -100,6 +100,7 @@ class Transport:
         self._receiver = MessageReceiver()
         self._listener = _NativeTransportListener(self._receiver)
         self._cpp: Any = None
+        self._demux: Any = None
 
     @property
     def local_endpoint(self) -> Endpoint:
@@ -124,13 +125,15 @@ class Transport:
             return
         if self._cpp is not None:
             try:
-                result = self._cpp.start()
+                starter = self._demux if self._demux is not None else self._cpp
+                result = starter.start()
                 if hasattr(result, "name") and result.name != "SUCCESS":
                     raise TransportError(f"Native transport failed to start: {result.name}")
             except TransportError:
                 raise
             except Exception:
-                pass
+                if self._demux is not None:
+                    raise
         self._running = True
 
     def stop(self) -> None:
@@ -138,7 +141,9 @@ class Transport:
         if not self._running:
             return
         self._running = False
-        if self._cpp is not None:
+        if self._demux is not None:
+            self._demux.stop()
+        elif self._cpp is not None:
             self._cpp.stop()
         self._receiver.close()
 
@@ -159,6 +164,26 @@ class Transport:
             raise TransportError("No target endpoint specified and no remote endpoint configured")
         cpp_ep = to_cpp_endpoint(target)
         self._cpp.send_message(cpp_msg, cpp_ep)
+
+    def attach_service_demux(self) -> Any:
+        """Attach a service demux to this socket.
+
+        The demux becomes the socket's only listener when :meth:`start`
+        runs. The socket must still be stopped, and it must outlive the
+        demux. A second call returns the demux already attached.
+        """
+        if self._demux is not None:
+            return self._demux
+        if self._cpp is None:
+            return None
+        if self._running:
+            raise TransportError("Cannot attach a service demux to a running transport")
+        ext = get_ext()
+        if ext is None:
+            return None
+        self._cpp.set_listener(None)
+        self._demux = ext.ServiceDemux(self._cpp)
+        return self._demux
 
     def __enter__(self) -> Self:
         self.start()

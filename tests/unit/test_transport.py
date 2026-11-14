@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -117,3 +118,75 @@ class TestTcpTransport:
         t.start()  # idempotent
         assert t.is_running is True
         t.stop()
+
+
+class TestServiceDemux:
+    def test_attach_installs_demux_on_stopped_socket(self) -> None:
+        transport = UdpTransport(Endpoint("127.0.0.1", 0))
+        native = MagicMock()
+        demux = MagicMock()
+        ext = MagicMock()
+        ext.ServiceDemux.return_value = demux
+        transport._cpp = native
+
+        with patch("opensomeip.transport.get_ext", return_value=ext):
+            attached = transport.attach_service_demux()
+            again = transport.attach_service_demux()
+
+        assert attached is demux
+        assert again is demux
+        native.set_listener.assert_called_once_with(None)
+        ext.ServiceDemux.assert_called_once_with(native)
+
+    def test_attach_without_extension_leaves_socket_alone(self) -> None:
+        transport = UdpTransport(Endpoint("127.0.0.1", 0))
+        transport._cpp = MagicMock()
+        with patch("opensomeip.transport.get_ext", return_value=None):
+            assert transport.attach_service_demux() is None
+        assert transport._demux is None
+
+    def test_stop_before_start_is_a_no_op(self) -> None:
+        transport = UdpTransport(Endpoint("127.0.0.1", 0))
+        transport.stop()
+        assert transport.is_running is False
+
+    def test_attach_rejects_running_socket(self) -> None:
+        transport = UdpTransport(Endpoint("127.0.0.1", 0))
+        transport._cpp = MagicMock()
+        transport._running = True
+        with (
+            patch("opensomeip.transport.get_ext", return_value=MagicMock()),
+            pytest.raises(TransportError, match="running"),
+        ):
+            transport.attach_service_demux()
+
+    def test_start_and_stop_delegate_to_demux(self) -> None:
+        transport = UdpTransport(Endpoint("127.0.0.1", 0))
+        native = MagicMock()
+        demux = MagicMock()
+        demux.start.return_value = SimpleNamespace(name="SUCCESS")
+        transport._cpp = native
+        transport._demux = demux
+
+        transport.start()
+        demux.start.assert_called_once()
+        native.start.assert_not_called()
+        transport.stop()
+        demux.stop.assert_called_once()
+        native.stop.assert_not_called()
+
+    def test_start_reports_demux_failure(self) -> None:
+        transport = UdpTransport(Endpoint("127.0.0.1", 0))
+        transport._cpp = MagicMock()
+        transport._demux = MagicMock()
+        transport._demux.start.return_value = SimpleNamespace(name="INVALID_STATE")
+        with pytest.raises(TransportError, match="INVALID_STATE"):
+            transport.start()
+
+    def test_start_propagates_demux_exception(self) -> None:
+        transport = UdpTransport(Endpoint("127.0.0.1", 0))
+        transport._cpp = MagicMock()
+        transport._demux = MagicMock()
+        transport._demux.start.side_effect = RuntimeError("demux")
+        with pytest.raises(RuntimeError, match="demux"):
+            transport.start()

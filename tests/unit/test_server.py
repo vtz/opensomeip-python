@@ -88,6 +88,17 @@ def tp_server_config() -> ServerConfig:
 
 
 class TestSomeIpServer:
+    def test_server_without_services_constructs(self) -> None:
+        config = ServerConfig(
+            local_endpoint=Endpoint("0.0.0.0", 30510),
+            sd_config=SdConfig(
+                multicast_endpoint=Endpoint("239.1.1.1", 30490),
+                unicast_endpoint=Endpoint("127.0.0.1", 30510),
+            ),
+        )
+        server = SomeIpServer(config)
+        assert server.rpc_server.is_running is False
+
     def test_lifecycle(self, server_config: ServerConfig) -> None:
         server = SomeIpServer(server_config)
         assert server.is_running is False

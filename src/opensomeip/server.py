@@ -101,7 +101,14 @@ class SomeIpServer:
             )
 
         self._sd_server = SdServer(config.sd_config)
-        self._rpc_server = RpcServer(self._transport)
+        service_ids: list[int] = []
+        for service in config.services:
+            if service.service_id not in service_ids:
+                service_ids.append(service.service_id)
+        if service_ids:
+            self._rpc_server = RpcServer(self._transport, service_ids=service_ids)
+        else:
+            self._rpc_server = RpcServer(self._transport)
         self._event_publisher = EventPublisher(self._transport)
 
         self._tp_manager: TpManager | None = None
