@@ -87,7 +87,13 @@ void init_sd(py::module_& m) {
         .def_readwrite("instance_id", &EventGroupSubscription::instance_id)
         .def_readwrite("eventgroup_id", &EventGroupSubscription::eventgroup_id)
         .def_readwrite("major_version", &EventGroupSubscription::major_version)
-        .def_readwrite("state", &EventGroupSubscription::state);
+        .def_readwrite("state", &EventGroupSubscription::state)
+        .def_readwrite("ttl_seconds", &EventGroupSubscription::ttl_seconds);
+
+    py::enum_<InitialDataDelivery>(sd, "InitialDataDelivery")
+        .value("DEFAULT", InitialDataDelivery::DEFAULT)
+        .value("REQUESTED", InitialDataDelivery::REQUESTED)
+        .value("SUPPRESSED", InitialDataDelivery::SUPPRESSED);
 
     py::class_<SdClient> sd_client(sd, "SdClient");
     py::class_<SdClient::Statistics>(sd_client, "Statistics")
@@ -100,6 +106,7 @@ void init_sd(py::module_& m) {
     sd_client
         .def(py::init<const SdConfig&>(), py::arg("config") = SdConfig())
         .def("initialize", &SdClient::initialize)
+        .def("get_transport_result", &SdClient::get_transport_result)
         .def("shutdown", &SdClient::shutdown, py::call_guard<py::gil_scoped_release>())
         .def("find_service", &SdClient::find_service,
              py::arg("service_id"), py::arg("callback"),
@@ -135,6 +142,7 @@ void init_sd(py::module_& m) {
     sd_server
         .def(py::init<const SdConfig&>(), py::arg("config") = SdConfig())
         .def("initialize", &SdServer::initialize)
+        .def("get_transport_result", &SdServer::get_transport_result)
         .def("shutdown", &SdServer::shutdown, py::call_guard<py::gil_scoped_release>())
         .def("offer_service", &SdServer::offer_service,
              py::arg("instance"), py::arg("unicast_endpoint"),

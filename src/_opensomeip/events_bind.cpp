@@ -3,6 +3,8 @@
 #include <pybind11/chrono.h>
 #include <pybind11/functional.h>
 
+#include <string_view>
+
 #include "events/event_types.h"
 #include "events/event_publisher.h"
 #include "events/event_subscriber.h"
@@ -69,7 +71,10 @@ void init_events(py::module_& m) {
         .def_readwrite("event_id", &EventNotification::event_id)
         .def_readwrite("client_id", &EventNotification::client_id)
         .def_readwrite("session_id", &EventNotification::session_id)
-        .def_readwrite("event_data", &EventNotification::event_data);
+        .def_readwrite("event_data", &EventNotification::event_data)
+        .def_readwrite("message_type", &EventNotification::message_type)
+        .def_readwrite("return_code", &EventNotification::return_code)
+        .def_readwrite("interface_version", &EventNotification::interface_version);
 
     py::class_<EventConfig>(events, "EventConfig")
         .def(py::init<>())
@@ -79,7 +84,23 @@ void init_events(py::module_& m) {
         .def_readwrite("notification_type", &EventConfig::notification_type)
         .def_readwrite("cycle_time", &EventConfig::cycle_time)
         .def_readwrite("is_field", &EventConfig::is_field)
+        .def_readwrite("has_getter", &EventConfig::has_getter)
+        .def_readwrite("getter_method_id", &EventConfig::getter_method_id)
+        .def_readwrite("has_setter", &EventConfig::has_setter)
+        .def_readwrite("setter_method_id", &EventConfig::setter_method_id)
+        .def_readwrite("has_notifier", &EventConfig::has_notifier)
         .def_readwrite("event_name", &EventConfig::event_name);
+
+    py::class_<EventgroupConfig>(events, "EventgroupConfig")
+        .def(py::init<>())
+        .def_readwrite("eventgroup_id", &EventgroupConfig::eventgroup_id)
+        .def_readwrite("multicast_threshold", &EventgroupConfig::multicast_threshold)
+        .def_readwrite("multicast_address", &EventgroupConfig::multicast_address)
+        .def_readwrite("multicast_port", &EventgroupConfig::multicast_port);
+
+    py::enum_<FieldSetOutcome>(events, "FieldSetOutcome")
+        .value("ACCEPTED", FieldSetOutcome::ACCEPTED)
+        .value("REJECTED", FieldSetOutcome::REJECTED);
 
     py::class_<EventFilter>(events, "EventFilter")
         .def(py::init<>())
@@ -110,6 +131,38 @@ void init_events(py::module_& m) {
         .def("publish_field", &EventPublisher::publish_field,
              py::arg("event_id"), py::arg("data"),
              py::call_guard<py::gil_scoped_release>())
+        .def("configure_eventgroup", &EventPublisher::configure_eventgroup, py::arg("config"))
+        .def("get_local_endpoint", &EventPublisher::get_local_endpoint)
+        .def("get_transport_result", &EventPublisher::get_transport_result)
+        .def("set_field_setter",
+             [](EventPublisher& self, py::function setter) {
+                 self.set_field_setter(
+                     [setter](uint16_t setter_method_id,
+                              const someip::platform::ByteBuffer& requested,
+                              someip::platform::ByteBuffer& accepted) -> FieldSetOutcome {
+                         py::gil_scoped_acquire gil;
+                         try {
+                             py::bytes req(reinterpret_cast<const char*>(requested.data()),
+                                           requested.size());
+                             py::object result = setter(setter_method_id, req);
+                             if (py::isinstance<py::tuple>(result)) {
+                                 auto outcome = result.cast<py::tuple>()[0].cast<FieldSetOutcome>();
+                                 auto stored = result.cast<py::tuple>()[1].cast<py::bytes>();
+                                 auto view = static_cast<std::string_view>(stored);
+                                 accepted.assign(view.begin(), view.end());
+                                 return outcome;
+                             }
+                             accepted = requested;
+                             return result.cast<FieldSetOutcome>();
+                         } catch (py::error_already_set& err) {
+                             err.discard_as_unraisable("EventPublisher.set_field_setter");
+                             return FieldSetOutcome::REJECTED;
+                         } catch (const py::cast_error&) {
+                             return FieldSetOutcome::REJECTED;
+                         }
+                     });
+             },
+             py::arg("setter"))
         .def("set_default_client_endpoint", &EventPublisher::set_default_client_endpoint,
              py::arg("address"), py::arg("port"))
         .def("handle_subscription",
@@ -157,10 +210,20 @@ void init_events(py::module_& m) {
              py::call_guard<py::gil_scoped_release>())
         .def("unsubscribe_eventgroup", &EventSubscriber::unsubscribe_eventgroup,
              py::arg("service_id"), py::arg("instance_id"), py::arg("eventgroup_id"))
+        .def("get_local_endpoint", &EventSubscriber::get_local_endpoint)
+        .def("get_transport_result", &EventSubscriber::get_transport_result)
         .def("request_field", &EventSubscriber::request_field,
-             py::arg("service_id"), py::arg("instance_id"), py::arg("event_id"),
+             py::arg("service_id"), py::arg("instance_id"), py::arg("getter_method_id"),
              py::arg("callback"),
+             py::arg("interface_version") = static_cast<uint8_t>(0x01),
              py::call_guard<py::gil_scoped_release>())
+        .def("set_field", &EventSubscriber::set_field,
+             py::arg("service_id"), py::arg("instance_id"), py::arg("setter_method_id"),
+             py::arg("value"), py::arg("callback"),
+             py::arg("interface_version") = static_cast<uint8_t>(0x01),
+             py::call_guard<py::gil_scoped_release>())
+        .def("cancel_field", &EventSubscriber::cancel_field,
+             py::arg("service_id"), py::arg("method_id"))
         .def("set_event_filters", &EventSubscriber::set_event_filters,
              py::arg("service_id"), py::arg("instance_id"), py::arg("eventgroup_id"),
              py::arg("filters"))
