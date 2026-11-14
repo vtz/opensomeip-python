@@ -183,6 +183,40 @@ class TestServiceDemux:
         with pytest.raises(TransportError, match="INVALID_STATE"):
             transport.start()
 
+    def test_tcp_demux_listens_and_does_not_connect(self) -> None:
+        transport = TcpTransport(Endpoint("127.0.0.1", 30630), Endpoint("127.0.0.1", 30631))
+        native = MagicMock()
+        native.initialize.return_value = SimpleNamespace(name="SUCCESS")
+        native.enable_server_mode.return_value = SimpleNamespace(name="SUCCESS")
+        demux = MagicMock()
+        demux.start.return_value = SimpleNamespace(name="SUCCESS")
+        transport._cpp = native
+        transport._demux = demux
+
+        with patch("opensomeip.transport.to_cpp_endpoint", return_value=object()):
+            transport.start()
+
+        native.initialize.assert_called_once()
+        native.enable_server_mode.assert_called_once_with()
+        native.connect.assert_not_called()
+        demux.start.assert_called_once()
+        transport.stop()
+
+    def test_tcp_demux_listen_failure_raises(self) -> None:
+        transport = TcpTransport(Endpoint("127.0.0.1", 30630))
+        native = MagicMock()
+        native.initialize.return_value = SimpleNamespace(name="SUCCESS")
+        native.enable_server_mode.return_value = SimpleNamespace(name="NETWORK_ERROR")
+        transport._cpp = native
+        transport._demux = MagicMock()
+
+        with (
+            patch("opensomeip.transport.to_cpp_endpoint", return_value=object()),
+            pytest.raises(TransportError, match="listen"),
+        ):
+            transport.start()
+        transport._demux.start.assert_not_called()
+
     def test_start_propagates_demux_exception(self) -> None:
         transport = UdpTransport(Endpoint("127.0.0.1", 0))
         transport._cpp = MagicMock()

@@ -292,11 +292,28 @@ class TcpTransport(Transport):
         if self._cpp is not None:
             cpp_local = to_cpp_endpoint(self._local)
             try:
-                self._cpp.initialize(cpp_local)
+                initialized = self._cpp.initialize(cpp_local)
             except Exception:
-                pass
+                if self._demux is not None:
+                    raise
+            else:
+                if (
+                    self._demux is not None
+                    and hasattr(initialized, "name")
+                    and initialized.name != "SUCCESS"
+                ):
+                    raise TransportError(
+                        f"Native TCP transport failed to initialize: {initialized.name}"
+                    )
+            # A demux-backed socket serves inbound RPC. Listening has to happen
+            # after bind and before the receive thread starts. Server mode
+            # cannot also connect, so a client socket (no demux) still connects.
+            if self._demux is not None:
+                listened = self._cpp.enable_server_mode()
+                if hasattr(listened, "name") and listened.name != "SUCCESS":
+                    raise TransportError(f"Native TCP transport failed to listen: {listened.name}")
         super().start()
-        if self._remote is not None:
+        if self._remote is not None and self._demux is None:
             self.connect()
 
     def stop(self) -> None:

@@ -198,3 +198,43 @@ class TestRpcRoundTrip:
         assert response.message_type == MessageType.RESPONSE
         assert response.return_code == ReturnCode.E_OK
         assert response.payload == b"\xca\xfe"
+
+    def test_two_services_share_the_server_socket(self) -> None:
+        """Two service ids on one demux both answer on the server endpoint."""
+        first = ServiceInstance(service_id=0x1234, instance_id=0x0001)
+        second = ServiceInstance(service_id=0x1235, instance_id=0x0001)
+        first_method = MessageId(service_id=0x1234, method_id=0x0001)
+        second_method = MessageId(service_id=0x1235, method_id=0x0002)
+        sd_config = SdConfig(
+            multicast_endpoint=Endpoint("239.1.1.1", 30490),
+            unicast_endpoint=Endpoint("127.0.0.1", 30642),
+        )
+        server_config = ServerConfig(
+            local_endpoint=Endpoint("127.0.0.1", 30640),
+            sd_config=sd_config,
+            services=[first, second],
+        )
+        client_config = ClientConfig(
+            local_endpoint=Endpoint("127.0.0.1", 30641),
+            remote_endpoint=Endpoint("127.0.0.1", 30640),
+            sd_config=sd_config,
+        )
+
+        def echo(req: Message) -> Message:
+            return Message(
+                message_id=req.message_id,
+                request_id=req.request_id,
+                message_type=MessageType.RESPONSE,
+                return_code=ReturnCode.E_OK,
+                payload=req.payload,
+            )
+
+        with SomeIpServer(server_config) as server:
+            server.register_method(first_method, echo)
+            server.register_method(second_method, echo)
+            with SomeIpClient(client_config) as client:
+                first_response = client.call(first_method, payload=b"\x01")
+                second_response = client.call(second_method, payload=b"\x02")
+
+        assert first_response.payload == b"\x01"
+        assert second_response.payload == b"\x02"
