@@ -3,6 +3,7 @@
 #include <pybind11/chrono.h>
 #include <pybind11/functional.h>
 
+#include <memory>
 #include <string_view>
 
 #include "events/event_types.h"
@@ -11,6 +12,29 @@
 
 namespace py = pybind11;
 using namespace someip::events;
+
+namespace {
+
+// Native shutdown and request handling copy and destroy the setter without
+// the GIL. Copying this handle does not touch Python; the last owner
+// releases the callback with the GIL held.
+struct PyFieldSetter {
+    py::function fn;
+
+    explicit PyFieldSetter(py::function callback) : fn(std::move(callback)) {}
+
+    PyFieldSetter(const PyFieldSetter&) = delete;
+    PyFieldSetter& operator=(const PyFieldSetter&) = delete;
+
+    ~PyFieldSetter() {
+        if (fn && Py_IsInitialized() != 0) {
+            py::gil_scoped_acquire gil;
+            fn = py::function();
+        }
+    }
+};
+
+}  // namespace
 
 void init_events(py::module_& m) {
     auto events = m.def_submodule("events", "Events bindings");
@@ -136,15 +160,16 @@ void init_events(py::module_& m) {
         .def("get_transport_result", &EventPublisher::get_transport_result)
         .def("set_field_setter",
              [](EventPublisher& self, py::function setter) {
+                 auto holder = std::make_shared<PyFieldSetter>(std::move(setter));
                  self.set_field_setter(
-                     [setter](uint16_t setter_method_id,
+                     [holder](uint16_t setter_method_id,
                               const someip::platform::ByteBuffer& requested,
                               someip::platform::ByteBuffer& accepted) -> FieldSetOutcome {
                          py::gil_scoped_acquire gil;
                          try {
                              py::bytes req(reinterpret_cast<const char*>(requested.data()),
                                            requested.size());
-                             py::object result = setter(setter_method_id, req);
+                             py::object result = holder->fn(setter_method_id, req);
                              if (py::isinstance<py::tuple>(result)) {
                                  auto outcome = result.cast<py::tuple>()[0].cast<FieldSetOutcome>();
                                  auto stored = result.cast<py::tuple>()[1].cast<py::bytes>();
