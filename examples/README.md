@@ -21,6 +21,7 @@ python -c "from opensomeip import _opensomeip; print('OK')"
 | Example | Description | Files |
 |---------|-------------|-------|
 | **Hello World** | Simplest request/response over UDP | `basic/hello_world/server.py`, `client.py` |
+| **Shared socket** | RPC on the application's UDP endpoint via `SomeIpServer` | `basic/shared_socket/server.py`, `client.py` |
 | **Method Calls** | Calculator RPC (add, multiply, get_stats) | `basic/method_calls/server.py`, `client.py` |
 | **Events** | Sensor publish/subscribe (temperature, speed) | `basic/events/publisher.py`, `subscriber.py` |
 | **SD Demo** | Service Discovery with multicast | `basic/sd_demo/server.py` |

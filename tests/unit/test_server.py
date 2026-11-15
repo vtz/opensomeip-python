@@ -12,10 +12,12 @@ Covers spec areas:
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 
 from opensomeip.e2e import E2ECheckStatus, E2EConfig, E2EProfile, E2EProfileId
-from opensomeip.exceptions import TransportError
+from opensomeip.exceptions import RpcError, TransportError
 from opensomeip.message import Message
 from opensomeip.sd import SdConfig, ServiceInstance
 from opensomeip.server import ServerConfig, SomeIpServer, TransportMode
@@ -88,6 +90,41 @@ def tp_server_config() -> ServerConfig:
 
 
 class TestSomeIpServer:
+    def test_server_without_services_constructs(self) -> None:
+        config = ServerConfig(
+            local_endpoint=Endpoint("0.0.0.0", 30510),
+            sd_config=SdConfig(
+                multicast_endpoint=Endpoint("239.1.1.1", 30490),
+                unicast_endpoint=Endpoint("127.0.0.1", 30510),
+            ),
+        )
+        server = SomeIpServer(config)
+        assert server.rpc_server.is_running is False
+
+    def test_start_stops_components_when_rpc_fails(self, server_config: ServerConfig) -> None:
+        server = SomeIpServer(server_config)
+        with (
+            patch.object(server.rpc_server, "start", side_effect=RpcError("register")),
+            pytest.raises(RpcError, match="register"),
+        ):
+            server.start()
+        assert server.is_running is False
+        assert server.transport.is_running is False
+        assert server.sd_server.is_running is False
+        assert server.event_publisher.is_running is False
+
+    def test_stop_continues_after_rpc_shutdown_error(self, server_config: ServerConfig) -> None:
+        server = SomeIpServer(server_config)
+        server.start()
+        with (
+            patch.object(server.rpc_server, "stop", side_effect=OSError("shutdown")),
+            pytest.raises(OSError, match="shutdown"),
+        ):
+            server.stop()
+        assert server.is_running is False
+        assert server.transport.is_running is False
+        assert server.sd_server.is_running is False
+
     def test_lifecycle(self, server_config: ServerConfig) -> None:
         server = SomeIpServer(server_config)
         assert server.is_running is False

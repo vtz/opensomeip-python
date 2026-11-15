@@ -93,6 +93,7 @@ from opensomeip.types import MessageId
 
 config = ClientConfig(
     local_endpoint=Endpoint("192.168.1.20", 30491),
+    remote_endpoint=Endpoint("192.168.1.10", 30490),
     sd_config=SdConfig(
         multicast_endpoint=Endpoint("239.1.1.1", 30490),
         unicast_endpoint=Endpoint("192.168.1.20", 30491),
@@ -124,6 +125,7 @@ from opensomeip.types import MessageId
 async def main():
     config = ClientConfig(
         local_endpoint=Endpoint("0.0.0.0", 30491),
+        remote_endpoint=Endpoint("192.168.1.10", 30490),
         sd_config=SdConfig(
             multicast_endpoint=Endpoint("239.1.1.1", 30490),
             unicast_endpoint=Endpoint("0.0.0.0", 30491),

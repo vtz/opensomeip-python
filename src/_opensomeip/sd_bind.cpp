@@ -6,6 +6,7 @@
 #include "sd/sd_types.h"
 #include "sd/sd_client.h"
 #include "sd/sd_server.h"
+#include "transport/transport.h"
 
 namespace py = pybind11;
 using namespace someip::sd;
@@ -105,6 +106,8 @@ void init_sd(py::module_& m) {
         .def_readonly("eventgroup_subscriptions", &SdClient::Statistics::eventgroup_subscriptions);
     sd_client
         .def(py::init<const SdConfig&>(), py::arg("config") = SdConfig())
+        .def(py::init<const SdConfig&, someip::transport::ITransport&>(),
+             py::arg("config"), py::arg("transport"), py::keep_alive<1, 3>())
         .def("initialize", &SdClient::initialize)
         .def("get_transport_result", &SdClient::get_transport_result)
         .def("shutdown", &SdClient::shutdown, py::call_guard<py::gil_scoped_release>())
@@ -141,6 +144,8 @@ void init_sd(py::module_& m) {
         .def_readonly("subscriptions_acknowledged", &SdServer::Statistics::subscriptions_acknowledged);
     sd_server
         .def(py::init<const SdConfig&>(), py::arg("config") = SdConfig())
+        .def(py::init<const SdConfig&, someip::transport::ITransport&>(),
+             py::arg("config"), py::arg("transport"), py::keep_alive<1, 3>())
         .def("initialize", &SdServer::initialize)
         .def("get_transport_result", &SdServer::get_transport_result)
         .def("shutdown", &SdServer::shutdown, py::call_guard<py::gil_scoped_release>())

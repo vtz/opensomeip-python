@@ -9,6 +9,7 @@
 #include "events/event_types.h"
 #include "events/event_publisher.h"
 #include "events/event_subscriber.h"
+#include "transport/transport.h"
 
 namespace py = pybind11;
 using namespace someip::events;
@@ -143,6 +144,10 @@ void init_events(py::module_& m) {
     pub
         .def(py::init<uint16_t, uint16_t>(),
              py::arg("service_id"), py::arg("instance_id"))
+        .def(py::init<uint16_t, uint16_t, someip::transport::ITransport&, uint8_t>(),
+             py::arg("service_id"), py::arg("instance_id"), py::arg("transport"),
+             py::arg("interface_version") = static_cast<uint8_t>(0x01),
+             py::keep_alive<1, 4>())
         .def("initialize", &EventPublisher::initialize)
         .def("shutdown", &EventPublisher::shutdown, py::call_guard<py::gil_scoped_release>())
         .def("register_event", &EventPublisher::register_event, py::arg("config"))
@@ -221,6 +226,9 @@ void init_events(py::module_& m) {
         .def_readonly("average_response_time", &EventSubscriber::Statistics::average_response_time);
     sub
         .def(py::init<uint16_t>(), py::arg("client_id"))
+        .def(py::init<uint16_t, someip::transport::ITransport&>(),
+             py::arg("client_id"), py::arg("transport"),
+             py::keep_alive<1, 3>())
         .def("initialize", &EventSubscriber::initialize)
         .def("shutdown", &EventSubscriber::shutdown, py::call_guard<py::gil_scoped_release>())
         .def("set_default_endpoint", &EventSubscriber::set_default_endpoint,

@@ -101,7 +101,14 @@ class SomeIpServer:
             )
 
         self._sd_server = SdServer(config.sd_config)
-        self._rpc_server = RpcServer(self._transport)
+        service_ids: list[int] = []
+        for service in config.services:
+            if service.service_id not in service_ids:
+                service_ids.append(service.service_id)
+        if service_ids:
+            self._rpc_server = RpcServer(self._transport, service_ids=service_ids)
+        else:
+            self._rpc_server = RpcServer(self._transport)
         self._event_publisher = EventPublisher(self._transport)
 
         self._tp_manager: TpManager | None = None
@@ -151,28 +158,64 @@ class SomeIpServer:
     # --- Lifecycle (feat_req_someip_900-904 error handling) ---
 
     def start(self) -> None:
-        """Start all server sub-components."""
-        self._transport.start()
-        self._sd_server.start()
-        self._rpc_server.start()
-        self._event_publisher.start()
-        if self._tp_manager is not None:
-            self._tp_manager.start()
-        for svc in self._config.services:
-            self._sd_server.offer(svc)
-        self._running = True
+        """Start all server sub-components.
+
+        If a later step fails, components that already started are stopped
+        before the error is raised. Context-manager entry does not call
+        ``__exit__`` when ``start`` raises.
+        """
+        started: list[Callable[[], None]] = []
+        try:
+            self._transport.start()
+            started.append(self._transport.stop)
+            self._sd_server.start()
+            started.append(self._sd_server.stop)
+            self._rpc_server.start()
+            started.append(self._rpc_server.stop)
+            self._event_publisher.start()
+            started.append(self._event_publisher.stop)
+            if self._tp_manager is not None:
+                self._tp_manager.start()
+                started.append(self._tp_manager.stop)
+            for svc in self._config.services:
+                self._sd_server.offer(svc)
+            self._running = True
+        except Exception:
+            for stop in reversed(started):
+                try:
+                    stop()
+                except Exception:
+                    pass
+            raise
 
     def stop(self) -> None:
-        """Stop all server sub-components in reverse order."""
+        """Stop all server sub-components in reverse order.
+
+        Every component is asked to stop. The first error is raised after
+        the remaining components have been stopped.
+        """
         self._running = False
+        errors: list[Exception] = []
+
+        def _step(action: Callable[[], None]) -> None:
+            try:
+                action()
+            except Exception as exc:
+                errors.append(exc)
+
+        def _withdraw(service: ServiceInstance) -> None:
+            _step(lambda: self._sd_server.stop_offer(service))
+
         for svc in self._config.services:
-            self._sd_server.stop_offer(svc)
+            _withdraw(svc)
         if self._tp_manager is not None:
-            self._tp_manager.stop()
-        self._event_publisher.stop()
-        self._rpc_server.stop()
-        self._sd_server.stop()
-        self._transport.stop()
+            _step(self._tp_manager.stop)
+        _step(self._event_publisher.stop)
+        _step(self._rpc_server.stop)
+        _step(self._sd_server.stop)
+        _step(self._transport.stop)
+        if errors:
+            raise errors[0]
 
     # --- RPC (method registration) ---
 

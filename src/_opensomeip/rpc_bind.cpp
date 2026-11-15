@@ -3,12 +3,77 @@
 #include <pybind11/chrono.h>
 #include <pybind11/functional.h>
 
+#include <memory>
+#include <string_view>
+
 #include "rpc/rpc_types.h"
 #include "rpc/rpc_client.h"
 #include "rpc/rpc_server.h"
+#include "transport/service_demux.h"
+#include "transport/transport.h"
 
 namespace py = pybind11;
 using namespace someip::rpc;
+
+namespace {
+
+// Native request handling copies the callback without the GIL. Copying this
+// handle does not touch Python; the last owner releases it with the GIL held.
+struct PyMethodHandler {
+    py::function fn;
+
+    explicit PyMethodHandler(py::function callback) : fn(std::move(callback)) {}
+
+    PyMethodHandler(const PyMethodHandler&) = delete;
+    PyMethodHandler& operator=(const PyMethodHandler&) = delete;
+
+    ~PyMethodHandler() {
+        if (fn && Py_IsInitialized() != 0) {
+            py::gil_scoped_acquire gil;
+            fn = py::function();
+        }
+    }
+};
+
+bool register_python_method(RpcServer& server, MethodId method_id, py::function handler,
+                            MethodSemantics semantics) {
+    auto holder = std::make_shared<PyMethodHandler>(std::move(handler));
+    return server.register_method(
+        method_id,
+        [holder](uint16_t client_id, uint16_t session_id,
+                 const someip::platform::ByteBuffer& input,
+                 someip::platform::ByteBuffer& output) {
+            py::gil_scoped_acquire gil;
+            try {
+                const py::bytes payload =
+                    input.empty() ? py::bytes()
+                                  : py::bytes(reinterpret_cast<const char*>(input.data()),
+                                              input.size());
+                py::object result = holder->fn(client_id, session_id, payload);
+                if (py::isinstance<py::tuple>(result)) {
+                    const auto items = result.cast<py::tuple>();
+                    if (items.size() != 2U) {
+                        return RpcResult::INTERNAL_ERROR;
+                    }
+                    const auto code = items[0].cast<RpcResult>();
+                    const auto body = items[1].cast<py::bytes>();
+                    const auto view = static_cast<std::string_view>(body);
+                    output.assign(view.begin(), view.end());
+                    return code;
+                }
+                return result.cast<RpcResult>();
+            } catch (const py::error_already_set&) {
+                return RpcResult::INTERNAL_ERROR;
+            } catch (const py::cast_error&) {
+                return RpcResult::INTERNAL_ERROR;
+            } catch (...) {
+                return RpcResult::INTERNAL_ERROR;
+            }
+        },
+        semantics);
+}
+
+}  // namespace
 
 void init_rpc(py::module_& m) {
     auto rpc = m.def_submodule("rpc", "RPC bindings");
@@ -74,6 +139,10 @@ void init_rpc(py::module_& m) {
              py::arg("client_id"),
              py::arg("interface_version") = static_cast<uint8_t>(0x01),
              py::arg("local_bind") = someip::transport::Endpoint("0.0.0.0", 0))
+        .def(py::init<uint16_t, someip::transport::ITransport&, uint8_t>(),
+             py::arg("client_id"), py::arg("transport"),
+             py::arg("interface_version") = static_cast<uint8_t>(0x01),
+             py::keep_alive<1, 3>())
         .def("initialize", &RpcClient::initialize)
         .def("shutdown", &RpcClient::shutdown, py::call_guard<py::gil_scoped_release>())
         .def("set_remote_endpoint", &RpcClient::set_remote_endpoint, py::arg("endpoint"))
@@ -136,9 +205,17 @@ void init_rpc(py::module_& m) {
              py::arg("interface_version") = static_cast<uint8_t>(0x01),
              py::arg("bind_endpoint") = someip::transport::Endpoint(
                  "127.0.0.1", SOMEIP_DEFAULT_RPC_PORT))
+        .def(py::init<uint16_t, someip::transport::ITransport&, uint8_t>(),
+             py::arg("service_id"), py::arg("transport"),
+             py::arg("interface_version") = static_cast<uint8_t>(0x01),
+             py::keep_alive<1, 3>())
+        .def(py::init<uint16_t, someip::transport::ServiceDemux&, uint8_t>(),
+             py::arg("service_id"), py::arg("demux"),
+             py::arg("interface_version") = static_cast<uint8_t>(0x01),
+             py::keep_alive<1, 3>())
         .def("initialize", &RpcServer::initialize)
         .def("shutdown", &RpcServer::shutdown, py::call_guard<py::gil_scoped_release>())
-        .def("register_method", &RpcServer::register_method,
+        .def("register_method", &register_python_method,
              py::arg("method_id"), py::arg("handler"),
              py::arg("semantics") = MethodSemantics::REQUEST_RESPONSE)
         .def("get_local_endpoint", &RpcServer::get_local_endpoint)
