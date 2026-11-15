@@ -11,6 +11,7 @@ import threading
 
 import pytest
 
+from opensomeip._bridge import get_ext
 from opensomeip.client import ClientConfig, SomeIpClient
 from opensomeip.exceptions import RpcError
 from opensomeip.message import Message
@@ -23,6 +24,11 @@ pytestmark = pytest.mark.integration
 
 SERVICE = ServiceInstance(service_id=0x1234, instance_id=0x0001)
 METHOD = MessageId(service_id=0x1234, method_id=0x0001)
+
+
+def _require_extension() -> None:
+    if get_ext() is None:
+        pytest.skip("opensomeip C++ extension is not available")
 
 
 @pytest.fixture()
@@ -164,6 +170,7 @@ class TestRpcRoundTrip:
         The server registers its service on a demux attached to
         ``local_endpoint``. The client keeps its own socket and sends there.
         """
+        _require_extension()
         sd_config = SdConfig(
             multicast_endpoint=Endpoint("239.1.1.1", 30490),
             unicast_endpoint=Endpoint("127.0.0.1", 30622),
@@ -201,6 +208,7 @@ class TestRpcRoundTrip:
 
     def test_two_services_share_the_server_socket(self) -> None:
         """Two service ids on one demux both answer on the server endpoint."""
+        _require_extension()
         first = ServiceInstance(service_id=0x1234, instance_id=0x0001)
         second = ServiceInstance(service_id=0x1235, instance_id=0x0001)
         first_method = MessageId(service_id=0x1234, method_id=0x0001)

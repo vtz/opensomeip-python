@@ -254,15 +254,27 @@ class RpcServer:
 
     def start(self) -> None:
         """Start the RPC server."""
-        for _, native in self._native_servers:
-            try:
-                ok = native.initialize()
-            except Exception:
-                if self._demux is not None:
-                    raise
-                continue
-            if ok is False and self._demux is not None:
-                raise RpcError("Native RPC server failed to register on the service demux")
+        started: list[Any] = []
+        try:
+            for _, native in self._native_servers:
+                try:
+                    ok = native.initialize()
+                except Exception:
+                    if self._demux is not None:
+                        raise
+                    continue
+                if ok is False:
+                    if self._demux is not None:
+                        raise RpcError("Native RPC server failed to register on the service demux")
+                    continue
+                started.append(native)
+        except Exception:
+            for native in reversed(started):
+                try:
+                    native.shutdown()
+                except Exception:
+                    pass
+            raise
         self._running = True
 
     def stop(self) -> None:
@@ -285,7 +297,7 @@ class RpcServer:
         for sid, native in self._native_servers:
             if sid == service_id:
                 return native
-        if self._native_servers:
+        if self._demux is None and self._native_servers:
             return self._native_servers[0][1]
         return None
 
@@ -295,9 +307,13 @@ class RpcServer:
         handler: Callable[[Message], Message],
     ) -> None:
         """Register a synchronous method handler."""
+        target = self._native_for(method_id.service_id)
+        if self._demux is not None and target is None:
+            raise RpcError(
+                f"service 0x{method_id.service_id:04X} is not configured on this server"
+            )
         self._handlers[method_id.value] = handler
 
-        target = self._native_for(method_id.service_id)
         ext = get_ext()
         if ext is not None and target is not None:
             success = ext.rpc.RpcResult.SUCCESS
