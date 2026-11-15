@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- towncrier release notes start -->
 
+## [0.2.1](https://github.com/vtz/opensomeip-python/releases/tag/v0.2.1) - 2026-11-15
+
+### Features
+
+- Update the opensomeip C++ submodule to **v0.2.2**. v0.2.1 binds field getter
+  and setter request/response, eventgroup multicast thresholds, variable E2E
+  parse options, and transport lifecycle diagnostics. v0.2.2 only aligns
+  version strings and release checks.
+- Serve RPC on the application socket. A server configured with services
+  registers each one on a `ServiceDemux` attached to that transport, instead
+  of a second ephemeral RPC socket. Injected-transport constructors are bound
+  for RPC, events, and service discovery. A TCP server socket listens for
+  connections. The client reaches that server by setting `remote_endpoint`
+  to the server's local endpoint.
+
+### Bug Fixes
+
+- If RPC startup or shutdown fails, the other server components are still stopped.
+- A demux-backed server rejects a method handler for a service that is not
+  configured, and unregisters services that already started when a later
+  service fails to register.
+
+### Miscellaneous
+
+- Bump `pypa/cibuildwheel` from 4.2 to 4.3.
+
 ## [0.2.0](https://github.com/vtz/opensomeip-python/releases/tag/v0.2.0) - 2026-10-06
 
 ### Features
