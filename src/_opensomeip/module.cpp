@@ -22,7 +22,7 @@ void init_exceptions(py::module_& m);
  */
 PYBIND11_MODULE(_opensomeip, m) {
     m.doc() = "Python bindings for the opensomeip C++ SOME/IP stack";
-    m.attr("__version__") = "0.2.1";
+    m.attr("__version__") = "0.2.2";
 
     init_exceptions(m);
     init_types(m);
