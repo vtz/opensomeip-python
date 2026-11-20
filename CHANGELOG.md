@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- towncrier release notes start -->
 
+## [0.2.2](https://github.com/vtz/opensomeip-python/releases/tag/v0.2.2) - 2026-11-20
+
+### Features
+
+- Build and publish pre-compiled wheels for **Python 3.15**, and run that
+  version in CI. `pip install` on CPython 3.15 no longer builds the package
+  from source.
+
 ## [0.2.1](https://github.com/vtz/opensomeip-python/releases/tag/v0.2.1) - 2026-11-15
 
 ### Features

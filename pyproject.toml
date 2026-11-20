@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "opensomeip"
-version = "0.2.1"
+version = "0.2.2"
 description = "Python bindings for the opensomeip C++ SOME/IP stack"
 readme = "README.md"
 license = "Apache-2.0"
@@ -59,7 +59,7 @@ wheel.packages = ["src/opensomeip"]
 cmake.build-type = "Release"
 
 [tool.scikit-build.cmake.define]
-OPENSOMEIP_PYTHON_VERSION = "0.2.1"
+OPENSOMEIP_PYTHON_VERSION = "0.2.2"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
