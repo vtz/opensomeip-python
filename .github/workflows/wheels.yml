@@ -71,3 +71,8 @@ jobs:
           name: sdist
           path: dist
       - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # A dispatch rebuilds files already on PyPI. Skip those so the new
+          # wheels still upload. A version tag keeps the default and fails
+          # if a file already exists.
+          skip-existing: ${{ github.event_name == 'workflow_dispatch' }}
