@@ -17,8 +17,10 @@ Python Versions
      - Supported
    * - 3.13
      - Supported
-   * - 3.14+
-     - Best-effort
+   * - 3.14
+     - Supported
+   * - 3.15
+     - Supported
 
 Platforms
 ---------

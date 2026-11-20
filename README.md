@@ -216,7 +216,7 @@ CC=/usr/bin/clang CXX=/usr/bin/clang++ \
   pip install --no-cache-dir --force-reinstall --no-binary=opensomeip opensomeip
 ```
 
-**Tip:** Pre-built wheels (available for Python 3.10 – 3.14 on macOS, Linux, and
+**Tip:** Pre-built wheels (available for Python 3.10 – 3.15 on macOS, Linux, and
 Windows) are compiled in CI with the correct toolchain and don't have this issue.
 If a wheel exists for your platform you'll never hit this problem — it only
 occurs when pip falls back to building from the source distribution.
